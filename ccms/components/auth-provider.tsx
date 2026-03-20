@@ -8,8 +8,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { authenticateOperator, requestPasswordReset } from "@/lib/auth/cognito";
-import { extractOperatorRole } from "@/lib/auth/jwt";
+import {
+  clearPendingLogin,
+  completeHostedLogin,
+  getHostedLogoutRedirectUrl,
+  startHostedLogin,
+} from "@/lib/auth/cognito";
+import { extractOperatorRole, extractOperatorUsername } from "@/lib/auth/jwt";
 import {
   getAuthSession,
   setAuthSession,
@@ -19,9 +24,9 @@ import {
 type AuthContextValue = {
   session: AuthSession | null;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  forgotPassword: (username: string) => Promise<void>;
-  logout: () => void;
+  loginWithRedirect: () => Promise<void>;
+  completeLoginFromCallback: (code: string, state: string) => Promise<void>;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -29,11 +34,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
 
-  const login = useCallback(async (username: string, password: string) => {
-    const tokens = await authenticateOperator(username, password);
+  const loginWithRedirect = useCallback(async () => {
+    await startHostedLogin();
+  }, []);
+
+  const completeLoginFromCallback = useCallback(async (code: string, state: string) => {
+    const tokens = await completeHostedLogin(code, state);
 
     const nextSession: AuthSession = {
-      username: username.trim(),
+      username: extractOperatorUsername(tokens.idToken, tokens.accessToken),
       idToken: tokens.idToken,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
@@ -44,24 +53,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(nextSession);
   }, []);
 
-  const forgotPassword = useCallback(async (username: string) => {
-    await requestPasswordReset(username);
-  }, []);
+  const logout = useCallback(async () => {
+    let logoutRedirectUrl: string | null = null;
+    try {
+      logoutRedirectUrl = getHostedLogoutRedirectUrl();
+    } catch {
+      logoutRedirectUrl = null;
+    }
 
-  const logout = useCallback(() => {
+    clearPendingLogin();
     setAuthSession(null);
     setSession(null);
+
+    if (logoutRedirectUrl && typeof window !== "undefined") {
+      window.location.assign(logoutRedirectUrl);
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       isAuthenticated: Boolean(session?.accessToken),
-      login,
-      forgotPassword,
+      loginWithRedirect,
+      completeLoginFromCallback,
       logout,
     }),
-    [forgotPassword, login, logout, session]
+    [completeLoginFromCallback, loginWithRedirect, logout, session]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 
 const navItems = [
@@ -13,7 +13,6 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { session, logout } = useAuth();
 
   return (
@@ -36,10 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
               <button
                 type="button"
-                onClick={() => {
-                  logout();
-                  router.replace("/login");
-                }}
+                onClick={() => void logout()}
                 className="rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-100 hover:bg-slate-700"
               >
                 Logout

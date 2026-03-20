@@ -1,0 +1,45 @@
+import json
+import boto3
+from decimal import Decimal
+
+# Initialize the DynamoDB resource outside the handler for warm-start execution efficiency
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('MeterTelemetry')
+
+def lambda_handler(event, context):
+    batch_failures = []
+    
+    # Iterate through the batch of messages delivered by SQS
+    for record in event['Records']:
+        try:
+            # parse_float=Decimal ensures all IEEE-754 floats comply with DynamoDB's precision constraints
+            payload = json.loads(record['body'], parse_float=Decimal)
+            
+            # Map the JSON keys to the DynamoDB Primary Keys
+            meter_pk = payload.get('client_id', 'UNKNOWN_METER')
+            
+            # Extract the accurate server timestamp injected by the IoT Rules Engine
+            timestamp_sk = int(payload.get('server_time', payload.get('timestamp', 0)))
+            
+            # Initialize the DynamoDB Item dictionary
+            item = {
+                'meter_id': meter_pk,
+                'timestamp': timestamp_sk
+            }
+            
+            # Dynamically append all Modbus register vectors (R3027, R3001, etc.)
+            for key, value in payload.items():
+                if key not in ['client_id', 'server_time', 'timestamp']:
+                    item[key] = value
+                    
+            # Execute the NoSQL write command
+            table.put_item(Item=item)
+            print(f"SUCCESS: Logged active vectors for {meter_pk} at T={timestamp_sk}")
+            
+        except Exception as e:
+            print(f"FAULT: Processing failed for record {record['messageId']}. Error: {str(e)}")
+            # Flag this specific message to remain in SQS for retry
+            batch_failures.append({'itemIdentifier': record['messageId']})
+            
+    # Return standard AWS response for SQS partial batch failures
+    return {'batchItemFailures': batch_failures}

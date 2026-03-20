@@ -2,7 +2,7 @@ export type AuthSession = {
   username: string;
   idToken: string;
   accessToken: string;
-  refreshToken: string;
+  refreshToken: string | null;
   role: "Admin" | "Operator" | null;
 };
 

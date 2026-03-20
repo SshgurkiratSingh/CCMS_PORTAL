@@ -24,6 +24,14 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 }
 
+function getStringClaim(
+  payload: Record<string, unknown> | null,
+  claim: string
+): string | null {
+  const value = payload?.[claim];
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
 export function extractOperatorRole(
   accessToken: string
 ): "Admin" | "Operator" | null {
@@ -48,4 +56,21 @@ export function extractOperatorRole(
   }
 
   return null;
+}
+
+export function extractOperatorUsername(
+  idToken: string,
+  accessToken: string
+): string {
+  const idPayload = decodeJwtPayload(idToken);
+  const accessPayload = decodeJwtPayload(accessToken);
+
+  return (
+    getStringClaim(idPayload, "preferred_username") ??
+    getStringClaim(idPayload, "cognito:username") ??
+    getStringClaim(idPayload, "email") ??
+    getStringClaim(accessPayload, "username") ??
+    getStringClaim(accessPayload, "cognito:username") ??
+    "Unknown Operator"
+  );
 }
