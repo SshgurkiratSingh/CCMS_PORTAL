@@ -8,11 +8,9 @@ export default function Home() {
           CCMS Portal
         </p>
         <h1 className="mt-2 text-2xl font-semibold">
-          Static Frontend Deployment
         </h1>
         <p className="mt-2 text-sm text-slate-300">
-          This build can be hosted on Vercel as static files with no Vercel
-          backend API.
+CCMS
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <Link

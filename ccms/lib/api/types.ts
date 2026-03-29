@@ -5,6 +5,10 @@ export type DashboardSummary = {
   activeAlarms: number;
   energyLast24hKwh: number;
   generatedAtUtc: string;
+  // Real-time grid parameters snapshot (from latest node)
+  gridAvgVoltage?: number;
+  gridFrequency?: number;
+  gridTotalPf?: number;
 };
 
 export type PanelRecord = {
@@ -28,10 +32,14 @@ export type PanelListResponse = {
 export type PanelLiveStatus = {
   panelId: string;
   reportedAtUtc: string;
-  voltage: number;
-  current: number;
-  kwh: number;
-  frequencyHz?: number;
+  // Schneider Meter Variables
+  phase1Voltage: number;    // R3027
+  avgVoltage: number;       // R3035
+  gridFrequency: number;    // R3109
+  powerFactorPh1: number;   // R3059
+  totalPowerFactor: number; // R3053
+  avgCurrent: number;       // R3009
+  powerVector: number;      // R3083
 };
 
 export type PanelCommandPayload =
@@ -55,10 +63,14 @@ export type PanelCommandResult = {
 
 export type TelemetryPoint = {
   timestampUtc: string;
-  phaseAkw: number;
-  phaseBkw: number;
-  phaseCkw: number;
-  totalKw: number;
+  phase1Voltage: number;    // R3027
+  avgVoltage: number;       // R3035
+  gridFrequency: number;    // R3109
+  powerFactorPh1: number;   // R3059
+  totalPowerFactor: number; // R3053
+  avgCurrent: number;       // R3009
+  powerVector: number;      // R3083
+  kwh?: number;             // Extrapolated energy placeholder
 };
 
 export type TelemetryResponse = {

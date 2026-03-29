@@ -1,4 +1,4 @@
-import { getAccessToken } from "@/lib/auth/session-store";
+import { getDashboardKey, getAdminKey } from "@/lib/auth/session-store";
 
 type RequestConfig = {
   method?: "GET" | "POST" | "PATCH";
@@ -21,17 +21,21 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const { method = "GET", body, requireAuth = true } = config;
 
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-  };
+  const headers = new Headers();
+  headers.append("Content-Type", "application/json");
 
   if (requireAuth) {
-    const accessToken = getAccessToken();
-    if (!accessToken) {
-      throw new Error("Missing access token. Login is required.");
+    const dashboardKey = getDashboardKey();
+    if (!dashboardKey) {
+      throw new Error("Missing dashboard key. Login is required.");
     }
 
-    headers.Authorization = `Bearer ${accessToken}`;
+    headers.append("x-dashboard-key", dashboardKey);
+
+    const adminKey = getAdminKey();
+    if (adminKey) {
+      headers.append("x-admin-key", adminKey);
+    }
   }
 
   const url = new URL(path, getApiBaseUrl()).toString();

@@ -29,7 +29,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </h1>
             </div>
             <div className="flex items-center gap-3 text-sm text-slate-300">
-              <span>{session?.username ?? "Unknown Operator"}</span>
               <span className="rounded-full border border-cyan-600/70 px-2 py-1 text-xs text-cyan-200">
                 {session?.role ?? "Viewer"}
               </span>
@@ -44,7 +43,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <nav className="mt-4 flex flex-wrap gap-2">
             {navItems.map((item) => {
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const active =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}

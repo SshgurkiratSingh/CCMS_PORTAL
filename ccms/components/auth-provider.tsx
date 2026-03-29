@@ -4,17 +4,11 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import {
-  clearPendingLogin,
-  completeHostedLogin,
-  getHostedLogoutRedirectUrl,
-  startHostedLogin,
-} from "@/lib/auth/cognito";
-import { extractOperatorRole, extractOperatorUsername } from "@/lib/auth/jwt";
 import {
   getAuthSession,
   setAuthSession,
@@ -24,62 +18,54 @@ import {
 type AuthContextValue = {
   session: AuthSession | null;
   isAuthenticated: boolean;
-  loginWithRedirect: () => Promise<void>;
-  completeLoginFromCallback: (code: string, state: string) => Promise<void>;
-  logout: () => Promise<void>;
+  login: (dashboardKey: string, adminKey?: string) => Promise<void>;
+  logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
-  const loginWithRedirect = useCallback(async () => {
-    await startHostedLogin();
+  useEffect(() => {
+    setSession(getAuthSession());
+    setIsMounted(true);
   }, []);
 
-  const completeLoginFromCallback = useCallback(async (code: string, state: string) => {
-    const tokens = await completeHostedLogin(code, state);
-
+  const login = useCallback(async (dashboardKey: string, adminKey?: string) => {
     const nextSession: AuthSession = {
-      username: extractOperatorUsername(tokens.idToken, tokens.accessToken),
-      idToken: tokens.idToken,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      role: extractOperatorRole(tokens.accessToken),
+      dashboardKey,
+      adminKey,
+      role: adminKey ? "Admin" : "Operator",
     };
 
     setAuthSession(nextSession);
     setSession(nextSession);
   }, []);
 
-  const logout = useCallback(async () => {
-    let logoutRedirectUrl: string | null = null;
-    try {
-      logoutRedirectUrl = getHostedLogoutRedirectUrl();
-    } catch {
-      logoutRedirectUrl = null;
-    }
-
-    clearPendingLogin();
+  const logout = useCallback(() => {
     setAuthSession(null);
     setSession(null);
 
-    if (logoutRedirectUrl && typeof window !== "undefined") {
-      window.location.assign(logoutRedirectUrl);
+    if (typeof window !== "undefined") {
+      window.location.assign("/login");
     }
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
-      isAuthenticated: Boolean(session?.accessToken),
-      loginWithRedirect,
-      completeLoginFromCallback,
+      isAuthenticated: Boolean(session?.dashboardKey),
+      login,
       logout,
     }),
-    [completeLoginFromCallback, loginWithRedirect, logout, session]
+    [login, logout, session],
   );
+
+  // Return empty provider on server to avoid hydration mismatch, since session relies on localStorage
+  if (!isMounted)
+    return <AuthContext.Provider value={value}>{null}</AuthContext.Provider>;
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

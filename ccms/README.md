@@ -4,8 +4,7 @@ This app is a Next.js operator console scaffold for the CCMS AWS architecture.
 
 ### Routes
 
-- `/login`: Starts Cognito Hosted UI OAuth login redirect (PKCE).
-- `/auth/callback`: OAuth callback handler and token exchange.
+- `/login`: Captures the Dashboard and Admin keys.
 - `/dashboard`: GET `/api/v1/dashboard/summary`
 - `/panels`: GET `/api/v1/panels` with status, limit, and offset.
 - `/panel?id={panelId}`: GET `/status` and POST `/command`.
@@ -16,19 +15,11 @@ This app is a Next.js operator console scaffold for the CCMS AWS architecture.
 
 Copy `.env.example` values into your local `.env.local` and fill real values:
 
-- `NEXT_PUBLIC_API_BASE_URL`
-- `NEXT_PUBLIC_COGNITO_REGION`
-- `NEXT_PUBLIC_COGNITO_CLIENT_ID`
-- `NEXT_PUBLIC_COGNITO_DOMAIN`
-- `NEXT_PUBLIC_COGNITO_REDIRECT_URI`
-- `NEXT_PUBLIC_COGNITO_LOGOUT_URI`
-- `NEXT_PUBLIC_COGNITO_OAUTH_SCOPES`
+- `NEXT_PUBLIC_API_BASE_URL` (Set this to the Lambda API endpoint prefix)
 
 ### Notes
 
-- Access token is held in in-memory client state and attached as `Authorization: Bearer <token>` on API requests.
-- Login uses Cognito Hosted UI Authorization Code Flow with PKCE.
-- Use a Cognito app client without a client secret for this frontend flow.
+- Keys are held in `localStorage` client state and attached as `x-dashboard-key` and `x-admin-key` headers on API requests.
 - Next.js is configured with static export mode (`output: "export"`), so Vercel can host this without Vercel serverless functions.
 
 ### Run
