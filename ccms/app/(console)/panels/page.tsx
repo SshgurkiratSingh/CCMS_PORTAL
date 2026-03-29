@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { getPanels } from "@/lib/api/ccms-api";
 import type { PanelRecord, PanelState } from "@/lib/api/types";
 import {
@@ -14,8 +15,13 @@ import {
   ChevronLeft,
   ChevronRight,
   HardDrive,
+  Map as MapIcon,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { formatDistanceToNow, parseISO } from "date-fns";
+
+const FleetMap = dynamic(() => import("@/components/fleet-map"), { ssr: false, loading: () => <div className="h-[600px] w-full rounded-xl border border-slate-700 bg-slate-900/40 flex items-center justify-center text-slate-500"><Activity className="animate-spin h-6 w-6 mr-2" /> Loading Spatial Maps...</div> });
 
 const statuses: Array<PanelState | "ALL"> = [
   "ALL",
@@ -106,7 +112,7 @@ export default function PanelsPage() {
   }, [rows, sortKey, searchQuery]);
 
   // View toggle
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "table" | "map">("grid");
 
   function getStatusStyle(state: PanelState) {
     switch (state) {
@@ -201,16 +207,22 @@ export default function PanelsPage() {
 
         <div className="flex rounded-lg border border-slate-700 bg-slate-950 p-1">
           <button
-            onClick={() => setViewMode("grid")}
-            className={`px-3 py-1 text-sm font-medium rounded ${viewMode === "grid" ? "bg-slate-800 text-slate-100" : "text-slate-500 hover:text-slate-300"}`}
+            onClick={() => setViewMode("map")}
+            className={`px-3 py-1 text-sm font-medium rounded flex items-center gap-1.5 ${viewMode === "map" ? "bg-slate-800 text-slate-100" : "text-slate-500 hover:text-slate-300"}`}
           >
-            Grid
+            <MapIcon className="h-4 w-4" /> Map
+          </button>
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`px-3 py-1 text-sm font-medium rounded flex items-center gap-1.5 ${viewMode === "grid" ? "bg-slate-800 text-slate-100" : "text-slate-500 hover:text-slate-300"}`}
+          >
+            <LayoutGrid className="h-4 w-4" /> Grid
           </button>
           <button
             onClick={() => setViewMode("table")}
-            className={`px-3 py-1 text-sm font-medium rounded ${viewMode === "table" ? "bg-slate-800 text-slate-100" : "text-slate-500 hover:text-slate-300"}`}
+            className={`px-3 py-1 text-sm font-medium rounded flex items-center gap-1.5 ${viewMode === "table" ? "bg-slate-800 text-slate-100" : "text-slate-500 hover:text-slate-300"}`}
           >
-            Table
+            <List className="h-4 w-4" /> Table
           </button>
         </div>
       </div>
@@ -232,6 +244,12 @@ export default function PanelsPage() {
         <div className="rounded-xl border border-slate-800 bg-slate-900/20 p-12 text-center text-slate-400">
           <HardDrive className="mx-auto h-8 w-8 text-slate-600 mb-3" />
           <p>No nodes match current filters.</p>
+        </div>
+      )}
+
+      {viewMode === "map" && filteredAndSorted.length > 0 && (
+        <div className="rounded-xl border border-slate-700 overflow-hidden bg-slate-900/40 p-2">
+          <FleetMap panels={filteredAndSorted} />
         </div>
       )}
 

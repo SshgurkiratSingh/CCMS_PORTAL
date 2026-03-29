@@ -27,24 +27,43 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   let gridAvgVoltage: number | undefined = undefined;
   let gridFrequency: number | undefined = undefined;
   let gridTotalPf: number | undefined = undefined;
+  
+  // Calculate instantaneous fleet power load in kW
+  let currentFleetPowerKw = 0;
 
   for (const item of snapshot) {
     if (item.metadata?.status === "FAULT") {
       activeAlarms++;
     }
 
-    if (item.recent_logs?.length > 0 && typeof gridAvgVoltage === "undefined") {
+    if (item.recent_logs?.length > 0) {
       const latest = item.recent_logs[0];
-      gridAvgVoltage = latest.R3035;        // Avg Volt
-      gridFrequency = latest.R3109;         // Freq
-      gridTotalPf = latest.R3053;           // System PF
+      
+      // Try to capture top-level grid metrics if not set
+      if (typeof gridAvgVoltage === "undefined") {
+        gridAvgVoltage = latest.R3035;        // Avg Volt
+        gridFrequency = latest.R3109;         // Freq
+        gridTotalPf = latest.R3053;           // System PF
+      }
+      
+      // Add up Power = (V * I * PF) / 1000
+      const v = latest.R3035 || 0;
+      const i = latest.R3009 || 0;
+      const pf = latest.R3053 || 0;
+      if (v > 0 && i > 0 && pf > 0) {
+        currentFleetPowerKw += (v * i * pf) / 1000;
+      }
     }
   }
+
+  // To simulate a rough 24h KWH consumption, we extrapolate the current load across 12 hours (night load)
+  // Real implementions would query an aggregations table in DynamoDB.
+  const estEnergyLast24hKwh = Math.round(currentFleetPowerKw * 12);
 
   return {
     totalPanels: snapshot.length,
     activeAlarms,
-    energyLast24hKwh: 0, // Placeholder or calculated from history if needed
+    energyLast24hKwh: estEnergyLast24hKwh, 
     gridAvgVoltage,
     gridFrequency,
     gridTotalPf,
