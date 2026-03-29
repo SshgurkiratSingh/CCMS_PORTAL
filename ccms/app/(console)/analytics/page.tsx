@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { getPanelTelemetry } from "@/lib/api/ccms-api";
-import type { TelemetryPoint, TelemetryResponse } from "@/lib/api/types";
+import { useMemo, useState, useEffect } from "react";
+import { getPanelTelemetry, getPanels } from "@/lib/api/ccms-api";
+import type { TelemetryPoint, TelemetryResponse, PanelRecord } from "@/lib/api/types";
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from "recharts";
@@ -34,12 +34,27 @@ export default function AnalyticsPage() {
     return copy;
   }, [now]);
 
+  const [panels, setPanels] = useState<PanelRecord[]>([]);
   const [panelId, setPanelId] = useState("");
   const [startDate, setStartDate] = useState(toInputDate(lastWeek));
   const [endDate, setEndDate] = useState(toInputDate(now));
   const [result, setResult] = useState<TelemetryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fetch available panels to populate the dropdown
+    getPanels({ limit: 100 })
+      .then((res) => {
+        setPanels(res.items);
+        if (res.items.length > 0 && !panelId) {
+          setPanelId(res.items[0].panelId);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load panels for analytics:", err);
+      });
+  }, []);
 
   const [activeTab, setActiveTab] = useState<TabType>("chart");
 
@@ -142,14 +157,30 @@ export default function AnalyticsPage() {
 
       <form onSubmit={onSubmit} className="grid gap-4 rounded-xl border border-slate-800/80 bg-slate-900/40 p-5 md:grid-cols-4 shadow-sm">
         <label className="text-sm font-medium">
-          <span className="block text-slate-400 mb-1.5">Panel ID</span>
-          <input
-            required
-            placeholder="e.g. PN-001"
-            value={panelId}
-            onChange={(event) => setPanelId(event.target.value)}
-            className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all"
-          />
+          <span className="block text-slate-400 mb-1.5">Select Node / Panel</span>
+          {panels.length > 0 ? (
+            <select
+              required
+              value={panelId}
+              onChange={(event) => setPanelId(event.target.value)}
+              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all"
+            >
+              <option value="" disabled>Select a panel...</option>
+              {panels.map((p) => (
+                <option key={p.panelId} value={p.panelId}>
+                  {p.panelId} {p.name && p.name !== p.panelId ? `(${p.name})` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              required
+              placeholder="e.g. PN-001 (Loading...)"
+              value={panelId}
+              onChange={(event) => setPanelId(event.target.value)}
+              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all"
+            />
+          )}
         </label>
 
         <label className="text-sm font-medium">

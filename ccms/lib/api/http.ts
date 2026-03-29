@@ -21,8 +21,9 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const { method = "GET", body, requireAuth = true } = config;
 
-  const headers = new Headers();
-  headers.append("Content-Type", "application/json");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
 
   if (requireAuth) {
     const dashboardKey = getDashboardKey();
@@ -30,11 +31,11 @@ export async function apiRequest<T>(
       throw new Error("Missing dashboard key. Login is required.");
     }
 
-    headers.append("x-dashboard-key", dashboardKey);
+    headers["x-dashboard-key"] = dashboardKey;
 
     const adminKey = getAdminKey();
     if (adminKey) {
-      headers.append("x-admin-key", adminKey);
+      headers["x-admin-key"] = adminKey;
     }
   }
 

@@ -56,118 +56,118 @@ def lambda_handler(event, context):
     if method == 'OPTIONS':
         return build_response(200, '')
 
-    headers = {k.lower(): v for k, v in (event.get('headers') or ) or {}).items()}
-        query_params = event.get('queryStringParameters') or {}
+    headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
+    query_params = event.get('queryStringParameters') or {}
 
-        # 2. DUAL-KEY AUTHENTICATION BARRICADE
-        dash_key, admin_key = get_vault_keys()
-        client_dash = headers.get('x-dashboard-key', '').strip()
-        client_admin = headers.get('x-admin-key', '').strip()
+    # 2. DUAL-KEY AUTHENTICATION BARRICADE
+    dash_key, admin_key = get_vault_keys()
+    client_dash = headers.get('x-dashboard-key', '').strip()
+    client_admin = headers.get('x-admin-key', '').strip()
 
-        # Base Level: Dashboard clearance is required for EVERYTHING
-        if client_dash != dash_key:
-    return build_response(401, {'error': 'Unauthorized: Level 1 key required.'})
+    # Base Level: Dashboard clearance is required for EVERYTHING
+    if client_dash != dash_key:
+        return build_response(401, {'error': 'Unauthorized: Level 1 key required.'})
 
-        # Elevated Level: Admin clearance required for MUTATIONS (POST, PUT, PATCH, DELETE)
-        if method in ['POST', 'PUT', 'PATCH', 'DELETE']:
-    if client_admin != admin_key:
-    return build_response(403, {'error': 'Forbidden: Level 2 Admin key required for mutations.'})
+    # Elevated Level: Admin clearance required for MUTATIONS (POST, PUT, PATCH, DELETE)
+    if method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+        if client_admin != admin_key:
+            return build_response(403, {'error': 'Forbidden: Level 2 Admin key required for mutations.'})
 
-        # 3. GLOBAL PARSING
-        try:
-    body = json.loads(event.get('body', '{}'), parse_float=Decimal)
-        except:
-    body = {}
+    # 3. GLOBAL PARSING
+    try:
+        body = json.loads(event.get('body', '{}'), parse_float=Decimal)
+    except:
+        body = {}
 
-        panel_id = query_params.get('panel_id') or body.get('panel_id')
+    panel_id = query_params.get('panel_id') or body.get('panel_id')
 
-        try:
+    try:
         # ==========================================
         # GET: READ / SYSTEM SNAPSHOT
         # ==========================================
-    if method == 'GET':
+        if method == 'GET':
             # ENQUIRY: Historical Telemetry
-    if query_params.get('enquiry') == 'history':
-    p_id = query_params.get('panel_id')
+            if query_params.get('enquiry') == 'history':
+                p_id = query_params.get('panel_id')
                 if not p_id:
-    return build_response(400, {'error': 'panel_id is required for history.'})
+                    return build_response(400, {'error': 'panel_id is required for history.'})
 
                 try:
-    start_ts = int(query_params.get('start', 0))
+                    start_ts = int(query_params.get('start', 0))
                     # Default far future
-                    end_ts= int(query_params.get('end', 2147483647000))
+                    end_ts = int(query_params.get('end', 2147483647000))
                 except ValueError:
-    return build_response(400, {'error': 'start and end must be integer timestamps.'})
+                    return build_response(400, {'error': 'start and end must be integer timestamps.'})
 
-                logs= TABLE_TELEMETRY.query(
-                    KeyConditionExpression =Key('meter_id').eq(p_id) & Key(
+                logs = TABLE_TELEMETRY.query(
+                    KeyConditionExpression=Key('meter_id').eq(p_id) & Key(
                         'timestamp').between(start_ts, end_ts),
-                    ScanIndexForward = True
+                    ScanIndexForward=True
                 ).get('Items', [])
-                    return build_response(200, logs)
+                return build_response(200, logs)
 
-                # ENQUIRY: Global System Snapshot (All Panels + Logs)
-                if query_params.get('enquiry') == 'snapshot':
-                all_panels= TABLE_METADATA.scan().get('Items', [])
-                snapshot= []
+            # ENQUIRY: Global System Snapshot (All Panels + Logs)
+            if query_params.get('enquiry') == 'snapshot':
+                all_panels = TABLE_METADATA.scan().get('Items', [])
+                snapshot = []
 
                 for panel in all_panels:
-                p_id = panel['panel_id']
+                    p_id = panel['panel_id']
                     # Pull latest 5 logs for each panel
-                    logs= TABLE_TELEMETRY.query(
-                        KeyConditionExpression = Key('meter_id').eq(p_id),
-                        ScanIndexForward = False,
-                        Limit = 5
+                    logs = TABLE_TELEMETRY.query(
+                        KeyConditionExpression=Key('meter_id').eq(p_id),
+                        ScanIndexForward=False,
+                        Limit=5
                     ).get('Items', [])
 
-                        snapshot.append({
+                    snapshot.append({
                         'metadata': panel,
                         'recent_logs': logs
                     })
-                    return build_response(200, snapshot)
+                return build_response(200, snapshot)
 
-                    # Standard Logic: Single Panel Metadata
-                    res = TABLE_METADATA.get_item(Key={'panel_id': panel_id})
-                    return build_response(200, res.get('Item', {}))
+            # Standard Logic: Single Panel Metadata
+            res = TABLE_METADATA.get_item(Key={'panel_id': panel_id})
+            return build_response(200, res.get('Item', {}))
 
-                    # ==========================================
-                    # POST/PUT: PROVISIONING (Admin Only)
-                    # ==========================================
-                    elif method in ['POST', 'PUT']:
+        # ==========================================
+        # POST/PUT: PROVISIONING (Admin Only)
+        # ==========================================
+        elif method in ['POST', 'PUT']:
             TABLE_METADATA.put_item(Item=body)
-                    return build_response(201, {'message': 'Command Executed: Panel Synchronized.'})
+            return build_response(201, {'message': 'Command Executed: Panel Synchronized.'})
 
-                    # ==========================================
-                    # PATCH: SURGICAL UPDATE (Admin Only)
-                    # ==========================================
-                    elif method == 'PATCH':
-            update_expr= []
-                    attr_names = {}
-                    attr_values = {}
+        # ==========================================
+        # PATCH: SURGICAL UPDATE (Admin Only)
+        # ==========================================
+        elif method == 'PATCH':
+            update_expr = []
+            attr_names = {}
+            attr_values = {}
 
-                    for k, v in body.items():
+            for k, v in body.items():
                 if k == 'panel_id':
                     continue
-                    update_expr.append(f"#{k} = :{k}")
-                    attr_names[f"#{k}"] = k
-                    attr_values[f":{k}"] = v
+                update_expr.append(f"#{k} = :{k}")
+                attr_names[f"#{k}"] = k
+                attr_values[f":{k}"] = v
 
-                    TABLE_METADATA.update_item(
-                Key = {'panel_id': panel_id},
-                UpdateExpression = "SET " + ", ".join(update_expr),
-                ExpressionAttributeNames = attr_names,
-                ExpressionAttributeValues = attr_values
+            TABLE_METADATA.update_item(
+                Key={'panel_id': panel_id},
+                UpdateExpression="SET " + ", ".join(update_expr),
+                ExpressionAttributeNames=attr_names,
+                ExpressionAttributeValues=attr_values
             )
-                return build_response(200, {'message': 'Operational state patched.'})
+            return build_response(200, {'message': 'Operational state patched.'})
 
-            # ==========================================
-            # DELETE: DECOMMISSION (Admin Only)
-            # ==========================================
-            elif method == 'DELETE':
+        # ==========================================
+        # DELETE: DECOMMISSION (Admin Only)
+        # ==========================================
+        elif method == 'DELETE':
             TABLE_METADATA.delete_item(Key={'panel_id': panel_id})
             return build_response(200, {'message': 'Panel decommissioned and purged.'})
 
-            except Exception as e:
-            return build_response(500, {'error': str(e)})
+    except Exception as e:
+        return build_response(500, {'error': str(e)})
 
-            return build_response(405, 'Method Not Allowed')
+    return build_response(405, 'Method Not Allowed')
