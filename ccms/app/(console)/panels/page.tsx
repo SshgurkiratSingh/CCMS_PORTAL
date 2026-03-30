@@ -17,11 +17,18 @@ import {
   HardDrive,
   Map as MapIcon,
   LayoutGrid,
-  List
+  List,
 } from "lucide-react";
 import { formatDistanceToNow, parseISO } from "date-fns";
 
-const FleetMap = dynamic(() => import("@/components/fleet-map"), { ssr: false, loading: () => <div className="h-[600px] w-full rounded-xl border border-slate-700 bg-slate-900/40 flex items-center justify-center text-slate-500"><Activity className="animate-spin h-6 w-6 mr-2" /> Loading Spatial Maps...</div> });
+const FleetMap = dynamic(() => import("@/components/fleet-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[600px] w-full rounded-xl border border-slate-700 bg-slate-900/40 flex items-center justify-center text-slate-500">
+      <Activity className="animate-spin h-6 w-6 mr-2" /> Loading Spatial Maps...
+    </div>
+  ),
+});
 
 const statuses: Array<PanelState | "ALL"> = [
   "ALL",
@@ -254,13 +261,14 @@ export default function PanelsPage() {
       )}
 
       {viewMode === "grid" && filteredAndSorted.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredAndSorted.map((panel) => (
-            <div
-              key={panel.panelId}
-              className="group relative flex flex-col rounded-xl border border-slate-700 bg-slate-900/40 p-5 hover:border-slate-500 transition-all hover:shadow-lg hover:shadow-cyan-900/5"
-            >
-              <div className="flex items-start justify-between mb-4">
+        <div className="grid gap-4 lg:grid-cols-3 xl:grid-cols-4 lg:items-start">
+          <div className="lg:col-span-2 xl:col-span-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+            {filteredAndSorted.map((panel) => (
+              <div
+                key={panel.panelId}
+                className="group relative flex flex-col rounded-xl border border-slate-700 bg-slate-900/40 p-5 hover:border-slate-500 transition-all hover:shadow-lg hover:shadow-cyan-900/5 hover:-translate-y-1 cursor-pointer"
+              >
+                <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="font-semibold text-slate-200 group-hover:text-cyan-300 transition-colors">
                     {panel.panelId}
@@ -319,6 +327,11 @@ export default function PanelsPage() {
               </div>
             </div>
           ))}
+          </div>
+
+          <div className="hidden lg:block lg:col-span-1 border border-slate-700 rounded-xl overflow-hidden shadow-lg hover:border-slate-500 hover:shadow-cyan-900/5 hover:-translate-y-1 transition-all bg-slate-900/40 p-2 lg:sticky lg:top-4 h-[calc(100vh-12rem)] min-h-[400px]">
+            <FleetMap panels={filteredAndSorted} className="h-full w-full rounded-lg border border-slate-800" />
+          </div>
         </div>
       )}
 

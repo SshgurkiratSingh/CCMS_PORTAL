@@ -91,7 +91,7 @@ export async function getPanels(params: {
       status,
       gpsLat: meta.location?.coordinates?.lat || 0,
       gpsLng: meta.location?.coordinates?.lng || 0,
-      macAddress: meta.mac_address || "00:00:00:00:00:00",
+      macAddress: item.recent_logs?.[0]?.mac_address || item.recent_logs?.[0]?.mac || item.recent_logs?.[0]?.macAddress || meta.mac_address || "00:00:00:00:00:00",
       firmwareVersion: meta.firmware || "1.0.0",
       lastSeenUtc: meta.last_seen || new Date().toISOString(),
     };

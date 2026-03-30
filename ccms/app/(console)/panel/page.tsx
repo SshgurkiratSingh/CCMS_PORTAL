@@ -1,14 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   postPanelCommand,
   getPanelStatus,
   getPanelTelemetry,
+  getPanels,
 } from "@/lib/api/ccms-api";
-import type { PanelLiveStatus, TelemetryPoint } from "@/lib/api/types";
+import type {
+  PanelLiveStatus,
+  TelemetryPoint,
+  PanelRecord,
+} from "@/lib/api/types";
+import registerMap from "@/lib/register-map.json";
 import {
   LineChart,
   Line,
@@ -30,8 +37,18 @@ import {
   History,
   BarChart2,
   Edit,
+  MapPin,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+
+const FleetMap = dynamic(() => import("@/components/fleet-map"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full min-h-[300px] w-full rounded-xl border border-slate-700 bg-slate-900/40 flex items-center justify-center text-slate-500">
+      <Activity className="animate-spin h-6 w-6 mr-2" /> Loading Spatial Maps...
+    </div>
+  ),
+});
 
 export default function PanelDetailsPage() {
   const searchParams = useSearchParams();
@@ -39,6 +56,7 @@ export default function PanelDetailsPage() {
 
   const [status, setStatus] = useState<PanelLiveStatus | null>(null);
   const [telemetry, setTelemetry] = useState<TelemetryPoint[]>([]);
+  const [panelInfo, setPanelInfo] = useState<PanelRecord | null>(null);
 
   const [timeRange, setTimeRange] = useState<"1H" | "24H" | "7D">("1H");
   const [manualState, setManualState] = useState<"ON" | "OFF">("ON");
@@ -57,16 +75,21 @@ export default function PanelDetailsPage() {
       else if (timeRange === "24H") startUtc.setHours(startUtc.getHours() - 24);
       else if (timeRange === "7D") startUtc.setDate(startUtc.getDate() - 7);
 
-      const [nextStatus, nextTelemetry] = await Promise.all([
+      const [nextStatus, nextTelemetry, panelsResponse] = await Promise.all([
         getPanelStatus(panelId),
         getPanelTelemetry({
           panelId,
           startUtcIso: startUtc.toISOString(),
           endUtcIso: endUtc.toISOString(),
         }),
+        getPanels({ limit: 1000 }),
       ]);
 
       setStatus(nextStatus);
+
+      // Locate this specific panel for mapping
+      const p = panelsResponse.items.find((x) => x.panelId === panelId);
+      setPanelInfo(p || null);
 
       // Sort telemetry strictly chronologically for charts
       const sortedPts = nextTelemetry.points.sort(
@@ -282,46 +305,36 @@ export default function PanelDetailsPage() {
 
       {/* Primary KPI Grid (Current Snapshot) */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
-        <StatBox
-          label="Phase 1 V"
-          value={status ? `${status.phase1Voltage.toFixed(1)} V` : "-"}
-        />
-        <StatBox
-          label="Avg V"
-          value={status ? `${status.avgVoltage.toFixed(1)} V` : "-"}
-          active={
-            status?.avgVoltage !== undefined &&
-            (status.avgVoltage > 250 || status.avgVoltage < 210)
-          }
-        />
-        <StatBox
-          label="Avg I"
-          value={status ? `${status.avgCurrent.toFixed(2)} A` : "-"}
-          highlight
-        />
-        <StatBox
-          label="Freq"
-          value={status ? `${status.gridFrequency.toFixed(2)} Hz` : "-"}
-        />
-        <StatBox
-          label="Ph1 PF"
-          value={status ? `${status.powerFactorPh1.toFixed(3)}` : "-"}
-          active={
-            status?.powerFactorPh1 !== undefined && status.powerFactorPh1 < 0.85
-          }
-        />
-        <StatBox
-          label="Total PF"
-          value={status ? `${status.totalPowerFactor.toFixed(3)}` : "-"}
-          active={
-            status?.totalPowerFactor !== undefined &&
-            status.totalPowerFactor < 0.85
-          }
-        />
-        <StatBox
-          label="Vector"
-          value={status ? `${status.powerVector.toFixed(2)}` : "-"}
-        />
+        {registerMap.registers
+          .filter((r) => r.category !== "Control")
+          .map((reg) => {
+            let valStr = "-";
+            let isActive = false;
+            let isHighlight = reg.id.includes("Current");
+
+            if (status) {
+              const v = status[reg.id as keyof typeof status];
+              if (v !== undefined) {
+                const numV = Number(v);
+                valStr =
+                  `${numV.toFixed(reg.id.includes("Factor") ? 3 : 1)} ${reg.unit}`.trim();
+
+                if (reg.id.includes("Voltage") && (numV > 250 || numV < 210))
+                  isActive = true;
+                if (reg.id.includes("PowerFactor") && numV < 0.85)
+                  isActive = true;
+              }
+            }
+            return (
+              <StatBox
+                key={reg.id}
+                label={reg.name}
+                value={valStr}
+                active={isActive}
+                highlight={isHighlight}
+              />
+            );
+          })}
       </div>
 
       <div className="flex justify-end pr-1 -mt-4">
@@ -361,37 +374,33 @@ export default function PanelDetailsPage() {
           <>
             <IntervalInsights data={telemetry} />
             <div className="grid gap-4 lg:grid-cols-2 mt-4">
-              <LiveChartCard
-                title="Instantaneous Voltage"
-                data={telemetry}
-                dataKey="avgVoltage"
-                color="#2dd4bf"
-                unit="V"
-                domain={[200, 260]}
-              />
-              <LiveChartCard
-                title="Load Current"
-                data={telemetry}
-                dataKey="avgCurrent"
-                color="#a78bfa"
-                unit="A"
-              />
-              <LiveChartCard
-                title="Grid Frequency"
-                data={telemetry}
-                dataKey="gridFrequency"
-                color="#38bdf8"
-                unit="Hz"
-                domain={[49, 51]}
-              />
-              <LiveChartCard
-                title="Power Factor"
-                data={telemetry}
-                dataKey="totalPowerFactor"
-                color="#fb7185"
-                unit=""
-                domain={[0, 1]}
-              />
+              {registerMap.registers
+                .filter(
+                  (r) =>
+                    r.category !== "Control" &&
+                    (r.priority === "high" || r.priority === "medium") &&
+                    r.id !== "phase1Voltage",
+                )
+                .slice(0, 4) // restrict to 4 main charts for layout
+                .map((reg) => (
+                  <LiveChartCard
+                    key={reg.id}
+                    title={reg.name}
+                    data={telemetry}
+                    dataKey={reg.id as keyof TelemetryPoint}
+                    color={reg.chartColor}
+                    unit={reg.unit}
+                    domain={
+                      reg.id.includes("Voltage")
+                        ? [200, 260]
+                        : reg.id.includes("Frequency")
+                          ? [49, 51]
+                          : reg.id.includes("PowerFactor")
+                            ? [0, 1.1]
+                            : undefined
+                    }
+                  />
+                ))}
             </div>
           </>
         ) : (
@@ -401,83 +410,112 @@ export default function PanelDetailsPage() {
         )}
       </div>
 
-      {/* Control Surface */}
-      <div className="grid gap-4 md:grid-cols-2 pt-6 border-t border-slate-800">
-        <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-5 shadow-lg relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Power className="h-24 w-24 text-slate-400" />
-          </div>
-          <h3 className="font-bold text-lg text-slate-200 flex items-center gap-2">
-            <Zap className="h-5 w-5 text-cyan-400" /> Relay Control
-          </h3>
-          <p className="mt-1 text-sm text-slate-400 max-w-[80%]">
-            Writes to device shadow over secure MQTT connection. Actuation
-            usually takes ~2s.
-          </p>
+      {/* Control Surface & Map */}
+      <div className="grid gap-4 lg:grid-cols-3 pt-6 border-t border-slate-800">
+        
+        {/* Controls container - span 2 cols on lg, then 2 inner cols */}
+        <div className="lg:col-span-2 grid gap-4 sm:grid-cols-2">
+          {/* Relay Control */}
+          <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-5 shadow-lg relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Power className="h-24 w-24 text-slate-400" />
+            </div>
+            <h3 className="font-bold text-lg text-slate-200 flex items-center gap-2">
+              <Zap className="h-5 w-5 text-cyan-400" /> Relay Control
+            </h3>
+            <p className="mt-1 text-sm text-slate-400 max-w-[80%]">
+              Writes to device shadow over secure MQTT connection. Actuation
+              usually takes ~2s.
+            </p>
 
-          <div className="mt-6 flex items-center gap-3 relative z-10">
-            <select
-              value={manualState}
-              onChange={(event) =>
-                setManualState(event.target.value as "ON" | "OFF")
-              }
-              className="rounded-md border border-slate-600 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-200 hover:border-slate-500 focus:border-cyan-500 outline-none w-32 shadow-inner"
-            >
-              <option value="ON">Relay ON</option>
-              <option value="OFF">Relay OFF</option>
-            </select>
-            <button
-              type="button"
-              onClick={() => void sendManualCommand()}
-              className="rounded-md bg-cyan-500 px-5 py-2 text-sm font-bold text-slate-950 hover:bg-cyan-400 transition-colors shadow-lg shadow-cyan-500/20"
-            >
-              Dispatch Command
-            </button>
+            <div className="mt-6 flex items-center gap-3 relative z-10">
+              <select
+                value={manualState}
+                onChange={(event) =>
+                  setManualState(event.target.value as "ON" | "OFF")
+                }
+                className="rounded-md border border-slate-600 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-200 hover:border-slate-500 focus:border-cyan-500 outline-none w-32 shadow-inner"
+              >
+                <option value="ON">Relay ON</option>
+                <option value="OFF">Relay OFF</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => void sendManualCommand()}
+                className="rounded-md bg-cyan-500 px-5 py-2 text-sm font-bold text-slate-950 hover:bg-cyan-400 transition-colors shadow-lg shadow-cyan-500/20"
+              >
+                Dispatch 
+              </button>
+            </div>
+          </div>
+
+          {/* RTC Schedule */}
+          <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-5 shadow-lg relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Settings2 className="h-24 w-24 text-slate-400" />
+            </div>
+            <h3 className="font-bold text-lg text-slate-200 flex items-center gap-2">
+              <Clock className="h-5 w-5 text-purple-400" /> RTC Schedule
+            </h3>
+            <p className="mt-1 text-sm text-slate-400 max-w-[80%]">
+              Set local chron-job configuration. Device will auto-actuate on daily intervals.
+            </p>
+
+            <div className="mt-6 flex flex-wrap items-end gap-3 relative z-10 text-sm">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Enable
+                </span>
+                <input
+                  type="time"
+                  value={scheduleStart}
+                  onChange={(event) => setScheduleStart(event.target.value)}
+                  className="rounded-md border border-slate-600 bg-slate-950 px-3 py-2 text-slate-200 focus:border-purple-500 outline-none shadow-inner [color-scheme:dark]"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Disable
+                </span>
+                <input
+                  type="time"
+                  value={scheduleEnd}
+                  onChange={(event) => setScheduleEnd(event.target.value)}
+                  className="rounded-md border border-slate-600 bg-slate-950 px-3 py-2 text-slate-200 focus:border-purple-500 outline-none shadow-inner [color-scheme:dark]"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void sendScheduleCommand()}
+                className="rounded-md bg-purple-500 px-5 py-2 text-sm font-bold text-white hover:bg-purple-400 transition-colors shadow-lg shadow-purple-500/20"
+              >
+                Sync RTC
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-5 shadow-lg relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Settings2 className="h-24 w-24 text-slate-400" />
+        {/* Map Container */}
+        <div className="lg:col-span-1 rounded-xl border border-slate-700 bg-slate-900/40 shadow-lg flex flex-col relative overflow-hidden">
+          <div className="p-4 border-b border-slate-800 bg-slate-900 flex justify-between items-center z-10">
+            <h3 className="font-bold text-lg text-slate-200 flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-rose-400" /> Geography
+            </h3>
+            {panelInfo && (
+              <span className="text-xs font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                {panelInfo.gpsLat.toFixed(4)}, {panelInfo.gpsLng.toFixed(4)}
+              </span>
+            )}
           </div>
-          <h3 className="font-bold text-lg text-slate-200 flex items-center gap-2">
-            <Clock className="h-5 w-5 text-purple-400" /> RTC Schedule
-          </h3>
-          <p className="mt-1 text-sm text-slate-400 max-w-[80%]">
-            Set local chron-job configuration. Device will auto-actuate on daily
-            intervals.
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-end gap-3 relative z-10 text-sm">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Enable
-              </span>
-              <input
-                type="time"
-                value={scheduleStart}
-                onChange={(event) => setScheduleStart(event.target.value)}
-                className="rounded-md border border-slate-600 bg-slate-950 px-3 py-2 text-slate-200 focus:border-purple-500 outline-none shadow-inner [color-scheme:dark]"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Disable
-              </span>
-              <input
-                type="time"
-                value={scheduleEnd}
-                onChange={(event) => setScheduleEnd(event.target.value)}
-                className="rounded-md border border-slate-600 bg-slate-950 px-3 py-2 text-slate-200 focus:border-purple-500 outline-none shadow-inner [color-scheme:dark]"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => void sendScheduleCommand()}
-              className="rounded-md bg-purple-500 px-5 py-2 text-sm font-bold text-white hover:bg-purple-400 transition-colors shadow-lg shadow-purple-500/20"
-            >
-              Sync RTC
-            </button>
+          <div className="flex-1 bg-slate-950 min-h-[300px] relative">
+            {panelInfo ? (
+              <FleetMap panels={[panelInfo]} className="absolute inset-0 h-full w-full rounded-none border-none shadow-none z-0" />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-slate-500 flex-col gap-2">
+                <Activity className="h-6 w-6 animate-spin opacity-50" />
+                <span className="text-sm">Mapping coordinates...</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

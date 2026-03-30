@@ -1,0 +1,110 @@
+{
+  "device": "CCMS_Smart_Meter_v1",
+  "version": "1.0.0",
+  "registers": [
+    {
+      "id": "phase1Voltage",
+      "address": "3027",
+      "name": "Phase 1 Voltage",
+      "description": "Instantaneous RMS voltage measured on Phase 1",
+      "unit": "V",
+      "dataType": "float32",
+      "multiplier": 1,
+      "priority": "high",
+      "access": "R",
+      "category": "Voltage",
+      "chartColor": "#2dd4bf"
+    },
+    {
+      "id": "avgVoltage",
+      "address": "3035",
+      "name": "Average Voltage",
+      "description": "Average RMS voltage across all connected phases",
+      "unit": "V",
+      "dataType": "float32",
+      "multiplier": 1,
+      "priority": "high",
+      "access": "R",
+      "category": "Voltage",
+      "chartColor": "#2dd4bf"
+    },
+    {
+      "id": "avgCurrent",
+      "address": "3009",
+      "name": "Average Current",
+      "description": "Average RMS current flowing across all phases",
+      "unit": "A",
+      "dataType": "float32",
+      "multiplier": 1,
+      "priority": "high",
+      "access": "R",
+      "category": "Current",
+      "chartColor": "#a78bfa"
+    },
+    {
+      "id": "gridFrequency",
+      "address": "3109",
+      "name": "Grid Frequency",
+      "description": "Real-time frequency of the utility power grid",
+      "unit": "Hz",
+      "dataType": "float32",
+      "multiplier": 1,
+      "priority": "medium",
+      "access": "R",
+      "category": "Power Quality",
+      "chartColor": "#38bdf8"
+    },
+    {
+      "id": "powerFactorPh1",
+      "address": "3059",
+      "name": "Phase 1 Power Factor",
+      "description": "Active to apparent power ratio for Phase 1",
+      "unit": "",
+      "dataType": "float32",
+      "multiplier": 1,
+      "priority": "medium",
+      "access": "R",
+      "category": "Power Quality",
+      "chartColor": "#fb7185"
+    },
+    {
+      "id": "totalPowerFactor",
+      "address": "3053",
+      "name": "Total Power Factor",
+      "description": "Combined system power factor",
+      "unit": "",
+      "dataType": "float32",
+      "multiplier": 1,
+      "priority": "high",
+      "access": "R",
+      "category": "Power Quality",
+      "chartColor": "#fb7185"
+    },
+    {
+      "id": "powerVector",
+      "address": "3083",
+      "name": "Power Vector",
+      "description": "Overall apparent power vector magnitude",
+      "unit": "kVA",
+      "dataType": "float32",
+      "multiplier": 1,
+      "priority": "low",
+      "access": "R",
+      "category": "Power",
+      "chartColor": "#facc15"
+    },
+    {
+      "id": "relayStatus",
+      "address": "0x0100",
+      "name": "Relay Contactor Status",
+      "description": "State of the main load contactor (0 = OFF, 1 = ON)",
+      "unit": "state",
+      "dataType": "uint16",
+      "multiplier": 1,
+      "priority": "critical",
+      "access": "RW",
+      "category": "Control",
+      "chartColor": "#e2e8f0"
+    }
+  ]
+}
