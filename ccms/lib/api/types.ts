@@ -17,7 +17,7 @@ export type PanelRecord = {
   status: PanelState;
   gpsLat: number;
   gpsLng: number;
-  macAddress: string;
+  deviceId: string;
   firmwareVersion: string;
   lastSeenUtc: string;
 };

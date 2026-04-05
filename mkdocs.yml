@@ -1,0 +1,9 @@
+site_name: CCMS Portal Documentation
+site_url: https://your-github-username.github.io/CCMS_PORTAL/
+theme:
+  name: material
+nav:
+  - Home: index.md
+  - Web Portal: web-portal.md
+  - Hardware (ESP32): hardware.md
+  - Lambda Backend: lambda.md

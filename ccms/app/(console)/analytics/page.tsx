@@ -4,7 +4,6 @@ import { useMemo, useState, useEffect, Fragment } from "react";
 import { getPanelTelemetry, getPanels } from "@/lib/api/ccms-api";
 import registerMap from "@/lib/register-map.json";
 import type {
-  TelemetryPoint,
   TelemetryResponse,
   PanelRecord,
 } from "@/lib/api/types";
@@ -26,6 +25,8 @@ import {
   Settings2,
   BarChart2,
 } from "lucide-react";
+import { Button, Card, Input } from "@heroui/react";
+import { ErrorBanner } from "@/components/ui";
 
 function toInputDate(date: Date): string {
   const year = date.getUTCFullYear();
@@ -61,7 +62,6 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fetch available panels to populate the dropdown
     getPanels({ limit: 100 })
       .then((res) => {
         setPanels(res.items);
@@ -79,8 +79,7 @@ export default function AnalyticsPage() {
   const mergedPoints = useMemo(() => {
     if (results.length === 0) return [];
 
-    // Merge by timestamp
-    const pointMap = new Map<string, any>();
+    const pointMap = new Map<string, Record<string, string | number>>();
 
     results.forEach((res) => {
       res.points.forEach((pt) => {
@@ -88,12 +87,12 @@ export default function AnalyticsPage() {
           pointMap.set(pt.timestampUtc, { timestampUtc: pt.timestampUtc });
         }
         const bucket = pointMap.get(pt.timestampUtc);
+        if (!bucket) return;
 
-        // Prefix properties with the panelId to render multiple series side-by-side!
         registerMap.registers.forEach((reg) => {
           const key = reg.id as keyof typeof pt;
           if (pt[key] !== undefined) {
-            bucket[`${res.panelId}_${reg.id}`] = pt[key];
+            bucket[`${res.panelId}_${reg.id}`] = pt[key] as number;
           }
         });
       });
@@ -101,16 +100,15 @@ export default function AnalyticsPage() {
 
     return Array.from(pointMap.values()).sort(
       (a, b) =>
-        new Date(a.timestampUtc).getTime() - new Date(b.timestampUtc).getTime(),
+        new Date(String(a.timestampUtc)).getTime() -
+        new Date(String(b.timestampUtc)).getTime(),
     );
   }, [results]);
 
-  // Custom multi-metric toggles for 'compare' mode
   const [compareMetrics, setCompareMetrics] = useState<Record<string, boolean>>(
     () => {
       const initial: Record<string, boolean> = {};
       registerMap.registers.forEach((reg) => {
-        // default ON for voltage and current
         initial[reg.id] = reg.id === "avgVoltage" || reg.id === "avgCurrent";
       });
       return initial;
@@ -144,7 +142,6 @@ export default function AnalyticsPage() {
 
       const fetchResults = await Promise.all(promises);
 
-      // Sort points chronologically just in case
       const sortedResults = fetchResults.map((res) => ({
         ...res,
         points: res.points.sort(
@@ -170,7 +167,6 @@ export default function AnalyticsPage() {
   const handleDownloadCsv = () => {
     if (results.length === 0) return;
 
-    // Build headers from registerMap
     const validRegisters = registerMap.registers.filter(
       (r) => r.category !== "Control",
     );
@@ -196,8 +192,9 @@ export default function AnalyticsPage() {
 
     const csvContent = [
       headers.join(","),
-      ...rows.map((e) => e.join(",")),
+      ...rows.map((entry) => entry.join(",")),
     ].join("\n");
+
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -211,7 +208,6 @@ export default function AnalyticsPage() {
     document.body.removeChild(link);
   };
 
-  // Recharts specific formatter
   const formatTimeXAxis = (tickItem: string) => {
     try {
       return format(parseISO(tickItem), "MMM dd, HH:mm");
@@ -229,13 +225,14 @@ export default function AnalyticsPage() {
             Telemetry Analytics
           </h2>
           {results.length > 0 && results.some((r) => r.points.length > 0) && (
-            <button
-              onClick={handleDownloadCsv}
-              className="flex items-center gap-2 rounded bg-indigo-500/10 px-3 py-1.5 text-sm font-medium text-indigo-300 hover:bg-indigo-500/20 hover:text-indigo-200 transition-colors border border-indigo-500/20"
+            <Button
+              variant="secondary"
+              onPress={handleDownloadCsv}
+              className="flex items-center gap-2"
             >
               <Download className="h-4 w-4" />
               Export CSV
-            </button>
+            </Button>
           )}
         </div>
         <p className="text-sm text-slate-400">
@@ -243,120 +240,118 @@ export default function AnalyticsPage() {
         </p>
       </div>
 
-      <form
-        onSubmit={onSubmit}
-        className="grid gap-4 rounded-xl border border-slate-800/80 bg-slate-900/40 p-5 md:grid-cols-4 shadow-sm"
-      >
-        <label className="text-sm font-medium">
-          <span className="block text-slate-400 mb-1.5">Select Node(s)</span>
-          <div className="relative group">
-            <div className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 focus-within:border-cyan-500 flex flex-wrap gap-1 min-h-[40px] cursor-pointer">
-              {selectedPanelIds.length === 0 && (
-                <span className="text-slate-500">Pick panels...</span>
-              )}
-              {selectedPanelIds.map((pid) => (
-                <span
-                  key={pid}
-                  className="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded text-xs flex items-center gap-1 border border-indigo-500/30"
-                >
-                  {pid}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handlePanelToggle(pid);
-                    }}
-                    className="hover:text-white"
+      <Card>
+        <form
+          onSubmit={onSubmit}
+          className="grid gap-4 rounded-xl border border-slate-800/80 bg-slate-900/40 p-5 md:grid-cols-4 shadow-sm"
+        >
+          <label className="text-sm font-medium">
+            <span className="block text-slate-400 mb-1.5">Select Node(s)</span>
+            <div className="relative group">
+              <div className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 focus-within:border-cyan-500 flex flex-wrap gap-1 min-h-10 cursor-pointer">
+                {selectedPanelIds.length === 0 && (
+                  <span className="text-slate-500">Pick panels...</span>
+                )}
+                {selectedPanelIds.map((pid) => (
+                  <span
+                    key={pid}
+                    className="bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded text-xs flex items-center gap-1 border border-indigo-500/30"
                   >
-                    &times;
-                  </button>
-                </span>
-              ))}
-            </div>
+                    {pid}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePanelToggle(pid);
+                      }}
+                      className="hover:text-white"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                ))}
+              </div>
 
-            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-md shadow-xl hidden group-hover:block max-h-60 overflow-y-auto">
-              {panels.map((p) => (
-                <label
-                  key={p.panelId}
-                  className="flex flex-row items-center gap-2 px-3 py-2 hover:bg-slate-800 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedPanelIds.includes(p.panelId)}
-                    onChange={() => handlePanelToggle(p.panelId)}
-                    className="rounded border-slate-700 bg-slate-950 text-indigo-500 focus:ring-indigo-500"
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-sm text-slate-200">{p.panelId}</span>
-                    {p.name && p.name !== p.panelId && (
-                      <span className="text-xs text-slate-500">{p.name}</span>
-                    )}
+              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-md shadow-xl hidden group-hover:block max-h-60 overflow-y-auto">
+                {panels.map((p) => (
+                  <label
+                    key={p.panelId}
+                    className="flex flex-row items-center gap-2 px-3 py-2 hover:bg-slate-800 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedPanelIds.includes(p.panelId)}
+                      onChange={() => handlePanelToggle(p.panelId)}
+                      className="rounded border-slate-700 bg-slate-950 text-indigo-500 focus:ring-indigo-500"
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-sm text-slate-200">{p.panelId}</span>
+                      {p.name && p.name !== p.panelId && (
+                        <span className="text-xs text-slate-500">{p.name}</span>
+                      )}
+                    </div>
+                  </label>
+                ))}
+                {panels.length === 0 && (
+                  <div className="px-3 py-2 text-slate-500 text-sm">
+                    Loading nodes...
                   </div>
-                </label>
-              ))}
-              {panels.length === 0 && (
-                <div className="px-3 py-2 text-slate-500 text-sm">
-                  Loading nodes...
-                </div>
-              )}
+                )}
+              </div>
             </div>
+          </label>
+
+          <label className="text-sm font-medium">
+            <span className="block text-slate-400 mb-1.5">Start Date (UTC)</span>
+            <Input
+              required
+              type="date"
+              variant="secondary"
+              value={startDate}
+              onChange={(event) => setStartDate(event.target.value)}
+            />
+          </label>
+
+          <label className="text-sm font-medium">
+            <span className="block text-slate-400 mb-1.5">End Date (UTC)</span>
+            <Input
+              required
+              type="date"
+              variant="secondary"
+              value={endDate}
+              onChange={(event) => setEndDate(event.target.value)}
+            />
+          </label>
+
+          <div className="flex items-end">
+            <Button
+              type="submit"
+              variant="primary"
+              isDisabled={loading}
+              className="w-full"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Activity className="h-4 w-4 animate-spin" /> Querying...
+                </span>
+              ) : (
+                "Run Query"
+              )}
+            </Button>
           </div>
-        </label>
+        </form>
+      </Card>
 
-        <label className="text-sm font-medium">
-          <span className="block text-slate-400 mb-1.5">Start Date (UTC)</span>
-          <input
-            required
-            type="date"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-            className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all [color-scheme:dark]"
-          />
-        </label>
-
-        <label className="text-sm font-medium">
-          <span className="block text-slate-400 mb-1.5">End Date (UTC)</span>
-          <input
-            required
-            type="date"
-            value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
-            className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all [color-scheme:dark]"
-          />
-        </label>
-
-        <div className="flex items-end">
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-indigo-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-indigo-400 transition-colors shadow-lg shadow-indigo-500/20"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <Activity className="h-4 w-4 animate-spin" /> Querying...
-              </span>
-            ) : (
-              "Run Query"
-            )}
-          </button>
-        </div>
-      </form>
-
-      {error && (
-        <div className="rounded-lg border border-rose-900/50 bg-rose-950/30 p-4 text-rose-400">
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} />}
 
       {results.length > 0 && !results.some((r) => r.points.length > 0) && (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/20 p-8 text-center text-slate-400">
+        <Card className="rounded-lg border border-slate-800 bg-slate-900/20 p-8 text-center text-slate-400">
           No telemetry points found for this range.
-        </div>
+        </Card>
       )}
 
       {results.length > 0 && results.some((r) => r.points.length > 0) && (
         <div className="space-y-4">
-          {/* Tabs */}
           <div className="flex gap-2 border-b border-slate-800 pb-px">
             <TabButton
               active={activeTab === "chart"}
@@ -381,7 +376,6 @@ export default function AnalyticsPage() {
             </TabButton>
           </div>
 
-          {/* Chart Tab */}
           {activeTab === "chart" && (
             <div className="grid gap-4 lg:grid-cols-2">
               {registerMap.registers
@@ -407,9 +401,8 @@ export default function AnalyticsPage() {
             </div>
           )}
 
-          {/* Compare Tab */}
           {activeTab === "compare" && (
-            <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+            <Card className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
               <div className="mb-6 flex flex-wrap gap-4 rounded-lg bg-slate-950/50 p-4 border border-slate-800">
                 <p className="w-full text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
                   Toggle Metrics overlay
@@ -421,15 +414,18 @@ export default function AnalyticsPage() {
                       key={reg.id}
                       label={reg.name}
                       checked={!!compareMetrics[reg.id]}
-                      onChange={(c) =>
-                        setCompareMetrics((p) => ({ ...p, [reg.id]: c }))
+                      onChange={(checked) =>
+                        setCompareMetrics((prev) => ({
+                          ...prev,
+                          [reg.id]: checked,
+                        }))
                       }
                       color={`bg-[${reg.chartColor}]`}
                     />
                   ))}
               </div>
 
-              <div className="h-[400px] w-full">
+              <div className="h-100 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={mergedPoints}
@@ -461,11 +457,11 @@ export default function AnalyticsPage() {
                         borderRadius: "8px",
                       }}
                       itemStyle={{ color: "#e2e8f0" }}
-                      labelFormatter={(l) => {
+                      labelFormatter={(label) => {
                         try {
-                          return format(parseISO(l as string), "PP pp");
+                          return format(parseISO(label as string), "PP pp");
                         } catch {
-                          return l;
+                          return label;
                         }
                       }}
                     />
@@ -514,19 +510,16 @@ export default function AnalyticsPage() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-            </div>
+            </Card>
           )}
 
-          {/* Raw Data Tab */}
           {activeTab === "data" && (
-            <div className="overflow-x-auto rounded-xl border border-slate-700">
+            <Card className="overflow-x-auto rounded-xl border border-slate-700">
               <table className="min-w-full text-sm text-slate-300">
                 <thead className="bg-slate-900/80 text-left text-slate-400 font-medium">
                   <tr>
                     <th className="px-4 py-3 whitespace-nowrap">Panel ID</th>
-                    <th className="px-4 py-3 whitespace-nowrap">
-                      Timestamp (UTC)
-                    </th>
+                    <th className="px-4 py-3 whitespace-nowrap">Timestamp (UTC)</th>
                     {registerMap.registers
                       .filter((r) => r.category !== "Control")
                       .map((reg) => (
@@ -550,24 +543,16 @@ export default function AnalyticsPage() {
                           {res.panelId}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-slate-400">
-                          {format(
-                            parseISO(point.timestampUtc),
-                            "yyyy-MM-dd HH:mm:ss",
-                          )}
+                          {format(parseISO(point.timestampUtc), "yyyy-MM-dd HH:mm:ss")}
                         </td>
                         {registerMap.registers
                           .filter((r) => r.category !== "Control")
                           .map((reg) => {
                             const val = point[reg.id as keyof typeof point];
                             return (
-                              <td
-                                key={reg.id}
-                                className="px-4 py-2 text-right font-mono"
-                              >
+                              <td key={reg.id} className="px-4 py-2 text-right font-mono">
                                 {typeof val === "number"
-                                  ? val.toFixed(
-                                      reg.id.includes("Factor") ? 3 : 2,
-                                    )
+                                  ? val.toFixed(reg.id.includes("Factor") ? 3 : 2)
                                   : String(val ?? "-")}
                               </td>
                             );
@@ -577,7 +562,7 @@ export default function AnalyticsPage() {
                   )}
                 </tbody>
               </table>
-            </div>
+            </Card>
           )}
         </div>
       )}
@@ -597,17 +582,15 @@ function TabButton({
   icon?: React.ReactNode;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
-        active
-          ? "border-indigo-400 text-indigo-300 bg-indigo-500/5"
-          : "border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-700"
-      }`}
+    <Button
+      size="sm"
+      variant={active ? "secondary" : "ghost"}
+      onPress={onClick}
+      className="flex items-center gap-2 text-sm font-medium"
     >
       {icon}
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -630,20 +613,17 @@ function MultiChartCard({
   domain,
 }: {
   title: string;
-  data: any[];
+  data: Array<Record<string, string | number>>;
   metricKey: string;
   panels: string[];
   domain?: [number | "auto", number | "auto"];
 }) {
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+    <Card className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
       <h3 className="mb-4 text-sm font-medium text-slate-300">{title}</h3>
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={data}
-            margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
-          >
+          <LineChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="#334155"
@@ -652,11 +632,11 @@ function MultiChartCard({
             />
             <XAxis
               dataKey="timestampUtc"
-              tickFormatter={(t) => {
+              tickFormatter={(tick) => {
                 try {
-                  return format(parseISO(t), "HH:mm");
+                  return format(parseISO(String(tick)), "HH:mm");
                 } catch {
-                  return t;
+                  return String(tick);
                 }
               }}
               stroke="#64748b"
@@ -677,11 +657,11 @@ function MultiChartCard({
                 fontSize: "12px",
               }}
               itemStyle={{ color: "#e2e8f0" }}
-              labelFormatter={(l) => {
+              labelFormatter={(label) => {
                 try {
-                  return format(parseISO(l as string), "PP pp");
+                  return format(parseISO(label as string), "PP pp");
                 } catch {
-                  return l;
+                  return label;
                 }
               }}
             />
@@ -702,7 +682,7 @@ function MultiChartCard({
           </LineChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -714,7 +694,7 @@ function Toggle({
 }: {
   label: string;
   checked: boolean;
-  onChange: (c: boolean) => void;
+  onChange: (checked: boolean) => void;
   color: string;
 }) {
   return (

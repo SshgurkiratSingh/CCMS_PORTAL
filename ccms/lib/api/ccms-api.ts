@@ -91,9 +91,11 @@ export async function getPanels(params: {
       status,
       gpsLat: meta.location?.coordinates?.lat || 0,
       gpsLng: meta.location?.coordinates?.lng || 0,
-      macAddress: item.recent_logs?.[0]?.mac_address || item.recent_logs?.[0]?.mac || item.recent_logs?.[0]?.macAddress || meta.mac_address || "00:00:00:00:00:00",
+      deviceId: item.recent_logs?.[0]?.device_id || meta.device_id || meta.mac_address || "Unknown",
       firmwareVersion: meta.firmware || "1.0.0",
-      lastSeenUtc: meta.last_seen || new Date().toISOString(),
+      lastSeenUtc: item.recent_logs?.[0]?.timestamp
+        ? new Date(Number(item.recent_logs[0].timestamp)).toISOString()
+        : meta.last_seen || new Date().toISOString(),
     };
   });
 

@@ -9,7 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@heroui/react": "^3.0.2",
+    "@heroui/styles": "^3.0.2",
     "date-fns": "^4.1.0",
+    "framer-motion": "^12.8.0",
     "leaflet": "^1.9.4",
     "leaflet-defaulticon-compatibility": "^0.1.2",
     "lucide-react": "^1.7.0",

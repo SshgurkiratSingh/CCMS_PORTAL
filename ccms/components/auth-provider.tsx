@@ -19,6 +19,7 @@ type AuthContextValue = {
   session: AuthSession | null;
   isAuthenticated: boolean;
   login: (dashboardKey: string, adminKey?: string) => Promise<void>;
+  setAdminKey: (adminKey: string) => Promise<void>;
   logout: () => void;
 };
 
@@ -44,6 +45,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(nextSession);
   }, []);
 
+  const setAdminKey = useCallback(
+    async (adminKey: string) => {
+      const trimmedAdminKey = adminKey.trim();
+      if (!trimmedAdminKey) {
+        throw new Error("Admin key is required.");
+      }
+
+      const persistedSession = getAuthSession();
+      const currentSession = persistedSession ?? session;
+      const dashboardKey = currentSession?.dashboardKey?.trim();
+
+      if (!dashboardKey) {
+        throw new Error("Missing dashboard key. Login is required.");
+      }
+
+      const nextSession: AuthSession = {
+        ...currentSession,
+        dashboardKey,
+        adminKey: trimmedAdminKey,
+        role: "Admin",
+      };
+
+      setAuthSession(nextSession);
+      setSession(nextSession);
+    },
+    [session],
+  );
+
   const logout = useCallback(() => {
     setAuthSession(null);
     setSession(null);
@@ -58,9 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       isAuthenticated: Boolean(session?.dashboardKey),
       login,
+      setAdminKey,
       logout,
     }),
-    [login, logout, session],
+    [login, logout, session, setAdminKey],
   );
 
   // Return empty provider on server to avoid hydration mismatch, since session relies on localStorage

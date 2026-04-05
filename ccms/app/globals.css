@@ -1,11 +1,12 @@
 @import "tailwindcss";
+@import "@heroui/styles";
 
 :root {
-  --background: #020617;
+  --background: #00040e;
   --foreground: #e2e8f0;
-  --surface: #0f172a;
-  --surface-strong: #020617;
-  --line: #334155;
+  --surface: #060d1f;
+  --surface-strong: #00040e;
+  --line: #1e293b;
   --accent: #22d3ee;
 }
 

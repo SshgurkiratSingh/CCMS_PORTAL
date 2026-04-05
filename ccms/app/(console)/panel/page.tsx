@@ -40,11 +40,13 @@ import {
   MapPin,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { Button, Card, Input } from "@heroui/react";
+import { ErrorBanner, SuccessBanner, WarningBanner } from "@/components/ui";
 
 const FleetMap = dynamic(() => import("@/components/fleet-map"), {
   ssr: false,
   loading: () => (
-    <div className="h-full min-h-[300px] w-full rounded-xl border border-slate-700 bg-slate-900/40 flex items-center justify-center text-slate-500">
+    <div className="h-full min-h-75 w-full rounded-xl border border-slate-700 bg-slate-900/40 flex items-center justify-center text-slate-500">
       <Activity className="animate-spin h-6 w-6 mr-2" /> Loading Spatial Maps...
     </div>
   ),
@@ -255,24 +257,9 @@ export default function PanelDetailsPage() {
         )}
       </div>
 
-      {!panelId && (
-        <div className="rounded-lg bg-amber-950/30 border border-amber-900/50 p-4 text-amber-400 flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5" /> Open this page as
-          `/panel?id=your-panel-id`.
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-lg border border-rose-900/50 bg-rose-950/30 p-4 text-rose-400 text-sm flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5" /> {error}
-        </div>
-      )}
-
-      {message && (
-        <div className="rounded-lg border border-emerald-900/50 bg-emerald-950/30 p-4 text-emerald-400 text-sm flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5" /> {message}
-        </div>
-      )}
+      {!panelId && <WarningBanner message="Open this page as /panel?id=your-panel-id." />}
+      {error && <ErrorBanner message={error} />}
+      {message && <SuccessBanner message={message} />}
 
       {/* Real-time Insights Panel */}
       {insights.length > 0 && (
@@ -355,17 +342,15 @@ export default function PanelDetailsPage() {
           </h3>
           <div className="flex items-center gap-2 bg-slate-900/50 p-1 rounded-lg border border-slate-800">
             {(["1H", "24H", "7D"] as const).map((range) => (
-              <button
+              <Button
                 key={range}
-                onClick={() => setTimeRange(range)}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                  timeRange === range
-                    ? "bg-indigo-500 text-white shadow-lg"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                }`}
+                size="sm"
+                variant={timeRange === range ? "primary" : "ghost"}
+                onPress={() => setTimeRange(range)}
+                className="px-4 text-xs font-semibold"
               >
                 {range}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -412,11 +397,10 @@ export default function PanelDetailsPage() {
 
       {/* Control Surface & Map */}
       <div className="grid gap-4 lg:grid-cols-3 pt-6 border-t border-slate-800">
-        
         {/* Controls container - span 2 cols on lg, then 2 inner cols */}
         <div className="lg:col-span-2 grid gap-4 sm:grid-cols-2">
           {/* Relay Control */}
-          <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-5 shadow-lg relative overflow-hidden group">
+          <Card className="rounded-xl border border-slate-700 bg-slate-900/40 p-5 shadow-lg relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <Power className="h-24 w-24 text-slate-400" />
             </div>
@@ -429,28 +413,36 @@ export default function PanelDetailsPage() {
             </p>
 
             <div className="mt-6 flex items-center gap-3 relative z-10">
-              <select
-                value={manualState}
-                onChange={(event) =>
-                  setManualState(event.target.value as "ON" | "OFF")
-                }
-                className="rounded-md border border-slate-600 bg-slate-950 px-4 py-2 text-sm font-medium text-slate-200 hover:border-slate-500 focus:border-cyan-500 outline-none w-32 shadow-inner"
-              >
-                <option value="ON">Relay ON</option>
-                <option value="OFF">Relay OFF</option>
-              </select>
-              <button
+              <div className="flex items-center rounded-md border border-slate-700 bg-slate-950 p-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={manualState === "ON" ? "primary" : "ghost"}
+                  onPress={() => setManualState("ON")}
+                >
+                  Relay ON
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={manualState === "OFF" ? "danger" : "ghost"}
+                  onPress={() => setManualState("OFF")}
+                >
+                  Relay OFF
+                </Button>
+              </div>
+              <Button
                 type="button"
-                onClick={() => void sendManualCommand()}
-                className="rounded-md bg-cyan-500 px-5 py-2 text-sm font-bold text-slate-950 hover:bg-cyan-400 transition-colors shadow-lg shadow-cyan-500/20"
+                variant="primary"
+                onPress={() => void sendManualCommand()}
               >
-                Dispatch 
-              </button>
+                Dispatch
+              </Button>
             </div>
-          </div>
+          </Card>
 
           {/* RTC Schedule */}
-          <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-5 shadow-lg relative overflow-hidden group">
+          <Card className="rounded-xl border border-slate-700 bg-slate-900/40 p-5 shadow-lg relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <Settings2 className="h-24 w-24 text-slate-400" />
             </div>
@@ -458,7 +450,8 @@ export default function PanelDetailsPage() {
               <Clock className="h-5 w-5 text-purple-400" /> RTC Schedule
             </h3>
             <p className="mt-1 text-sm text-slate-400 max-w-[80%]">
-              Set local chron-job configuration. Device will auto-actuate on daily intervals.
+              Set local chron-job configuration. Device will auto-actuate on
+              daily intervals.
             </p>
 
             <div className="mt-6 flex flex-wrap items-end gap-3 relative z-10 text-sm">
@@ -466,37 +459,37 @@ export default function PanelDetailsPage() {
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Enable
                 </span>
-                <input
+                <Input
                   type="time"
+                  variant="secondary"
                   value={scheduleStart}
                   onChange={(event) => setScheduleStart(event.target.value)}
-                  className="rounded-md border border-slate-600 bg-slate-950 px-3 py-2 text-slate-200 focus:border-purple-500 outline-none shadow-inner [color-scheme:dark]"
                 />
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Disable
                 </span>
-                <input
+                <Input
                   type="time"
+                  variant="secondary"
                   value={scheduleEnd}
                   onChange={(event) => setScheduleEnd(event.target.value)}
-                  className="rounded-md border border-slate-600 bg-slate-950 px-3 py-2 text-slate-200 focus:border-purple-500 outline-none shadow-inner [color-scheme:dark]"
                 />
               </label>
-              <button
+              <Button
                 type="button"
-                onClick={() => void sendScheduleCommand()}
-                className="rounded-md bg-purple-500 px-5 py-2 text-sm font-bold text-white hover:bg-purple-400 transition-colors shadow-lg shadow-purple-500/20"
+                variant="secondary"
+                onPress={() => void sendScheduleCommand()}
               >
                 Sync RTC
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         </div>
 
         {/* Map Container */}
-        <div className="lg:col-span-1 rounded-xl border border-slate-700 bg-slate-900/40 shadow-lg flex flex-col relative overflow-hidden">
+        <Card className="lg:col-span-1 rounded-xl border border-slate-700 bg-slate-900/40 shadow-lg flex flex-col relative overflow-hidden">
           <div className="p-4 border-b border-slate-800 bg-slate-900 flex justify-between items-center z-10">
             <h3 className="font-bold text-lg text-slate-200 flex items-center gap-2">
               <MapPin className="h-5 w-5 text-rose-400" /> Geography
@@ -507,9 +500,12 @@ export default function PanelDetailsPage() {
               </span>
             )}
           </div>
-          <div className="flex-1 bg-slate-950 min-h-[300px] relative">
+          <div className="flex-1 bg-slate-950 min-h-75 relative">
             {panelInfo ? (
-              <FleetMap panels={[panelInfo]} className="absolute inset-0 h-full w-full rounded-none border-none shadow-none z-0" />
+              <FleetMap
+                panels={[panelInfo]}
+                className="absolute inset-0 h-full w-full rounded-none border-none shadow-none z-0"
+              />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-slate-500 flex-col gap-2">
                 <Activity className="h-6 w-6 animate-spin opacity-50" />
@@ -517,12 +513,11 @@ export default function PanelDetailsPage() {
               </div>
             )}
           </div>
-        </div>
+        </Card>
       </div>
     </section>
   );
 }
-
 function StatBox({
   label,
   value,
@@ -547,7 +542,7 @@ function StatBox({
       : "text-slate-100 font-semibold";
 
   return (
-    <div
+    <Card
       className={`rounded-xl border p-4 transition-all duration-300 flex flex-col justify-center ${bg} ${active ? "animate-pulse" : ""}`}
     >
       <p
@@ -556,7 +551,7 @@ function StatBox({
         {label}
       </p>
       <p className={`text-xl font-mono ${valColor}`}>{value}</p>
-    </div>
+    </Card>
   );
 }
 
@@ -583,7 +578,7 @@ function LiveChartCard({
       : "-";
 
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-900/30 p-4 flex flex-col">
+    <Card className="rounded-xl border border-slate-700 bg-slate-900/30 p-4 flex flex-col">
       <div className="flex justify-between items-center mb-4 border-b border-slate-800/60 pb-2">
         <h3 className="text-sm font-semibold text-slate-300">{title}</h3>
         <div className="flex items-baseline gap-1">
@@ -658,7 +653,7 @@ function LiveChartCard({
           </LineChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -719,13 +714,13 @@ function InsightBox({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-slate-700/50 bg-slate-800/40 p-3 shadow-sm hover:bg-slate-800/60 transition-colors">
+    <Card className="rounded-lg border border-slate-700/50 bg-slate-800/40 p-3 shadow-sm hover:bg-slate-800/60 transition-colors">
       <p className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1">
         {icon} {label}
       </p>
       <p className={`text-lg font-bold mt-1 ${color || "text-slate-200"}`}>
         {value}
       </p>
-    </div>
+    </Card>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
+import { Button, Card, Chip, Input } from "@heroui/react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,48 +41,59 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#334155_0%,#020617_66%)] px-4 py-10 text-slate-100">
-      <div className="w-full max-w-md rounded-2xl border border-slate-700/70 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/70 backdrop-blur">
-        <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">
-          Authentication Gateway
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold">CCMS Operator Login</h1>
-        <p className="mt-2 text-sm text-slate-300">
-          Sign-in is handled by local Dashboard Key. The key is stored locally
-          and sent as a header to the API.
-        </p>
+      <Card className="w-full max-w-md border border-slate-700/70 bg-slate-900/80 p-6 shadow-2xl shadow-slate-950/70 backdrop-blur">
+        <div className="space-y-2">
+          <Chip
+            className="uppercase tracking-[0.2em]"
+            color="accent"
+            size="sm"
+            variant="soft"
+          >
+            Authentication Gateway
+          </Chip>
+          <h1 className="text-2xl font-semibold">CCMS Operator Login</h1>
+          <p className="text-sm text-slate-300">
+            Sign-in is handled by local Dashboard Key. The key is stored locally
+            and sent as a header to the API.
+          </p>
+        </div>
 
         <form onSubmit={onContinue} className="mt-6 flex flex-col gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-300">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-slate-300">
               Dashboard Key *
-            </label>
-            <input
+            </p>
+            <Input
               type="password"
+              variant="secondary"
               value={dashboardKey}
               onChange={(e) => setDashboardKey(e.target.value)}
-              className="mt-1 block w-full rounded-md border-slate-600 bg-slate-800 text-slate-100 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm p-2"
               required
+              placeholder="Enter dashboard key"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-300">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-slate-300">
               Admin Key (Optional)
-            </label>
-            <input
+            </p>
+            <Input
               type="password"
+              variant="secondary"
               value={adminKey}
               onChange={(e) => setAdminKey(e.target.value)}
-              className="mt-1 block w-full rounded-md border-slate-600 bg-slate-800 text-slate-100 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 sm:text-sm p-2"
+              placeholder="Enter admin key"
             />
           </div>
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="mt-2 w-full rounded-md bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+            variant="primary"
+            isDisabled={loading}
+            isPending={loading}
+            className="mt-2 w-full"
           >
             {loading ? "Logging in..." : "Login"}
-          </button>
+          </Button>
         </form>
 
         {error && (
@@ -89,7 +101,7 @@ export default function LoginPage() {
             {error}
           </p>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
