@@ -121,9 +121,27 @@ export async function getPanelStatus(panelId: string): Promise<PanelLiveStatus> 
   const logs = panel?.recent_logs || [];
   const latest = logs[0] || {};
 
+  const readNumber = (...values: unknown[]) => {
+    for (const value of values) {
+      const n = Number(value);
+      if (!Number.isNaN(n)) return n;
+    }
+    return 0;
+  };
+
+  const mainsStatusRaw = String(latest.mainsStatus ?? latest.mains_status ?? "OFF").toUpperCase();
+
   return {
     panelId,
+    clientId: latest.client_id ?? latest.device_id,
+    timestamp: readNumber(latest.timestamp),
     reportedAtUtc: latest.timestamp ? new Date(Number(latest.timestamp)).toISOString() : new Date().toISOString(),
+    batteryVoltage: readNumber(latest.batteryVoltage, latest.battery_voltage),
+    mainsVoltageRaw: readNumber(latest.mainsVoltageRaw, latest.mains_voltage_raw),
+    mainsStatus: mainsStatusRaw,
+    tiltSwitch: readNumber(latest.tiltSwitch, latest.tilt_switch),
+    temperature: readNumber(latest.temperature),
+    r3003: readNumber(latest.R3003),
     phase1Voltage: latest.R3027 || 0,
     avgVoltage: latest.R3035 || 0,
     gridFrequency: latest.R3109 || 0,
@@ -170,8 +188,24 @@ export async function getPanelTelemetry(input: {
     `DashboardAPIHandler?enquiry=history&panel_id=${input.panelId}&start=${startTs}&end=${endTs}`
   );
 
+  const readNumber = (...values: unknown[]) => {
+    for (const value of values) {
+      const n = Number(value);
+      if (!Number.isNaN(n)) return n;
+    }
+    return 0;
+  };
+
   const points = (logs || []).map((log: any) => ({
     timestampUtc: log.timestamp ? new Date(Number(log.timestamp)).toISOString() : new Date().toISOString(),
+    timestamp: readNumber(log.timestamp),
+    clientId: log.client_id ?? log.device_id,
+    batteryVoltage: readNumber(log.batteryVoltage, log.battery_voltage),
+    mainsVoltageRaw: readNumber(log.mainsVoltageRaw, log.mains_voltage_raw),
+    mainsStatus: String(log.mainsStatus ?? log.mains_status ?? "OFF").toUpperCase(),
+    tiltSwitch: readNumber(log.tiltSwitch, log.tilt_switch),
+    temperature: readNumber(log.temperature),
+    r3003: readNumber(log.R3003),
     phase1Voltage: log.R3027 || 0,
     avgVoltage: log.R3035 || 0,
     gridFrequency: log.R3109 || 0,

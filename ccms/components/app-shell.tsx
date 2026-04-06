@@ -6,30 +6,32 @@ import { Button, Chip } from "@heroui/react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/panels", label: "Panels" },
+  { href: "/panels",    label: "Panels"    },
   { href: "/analytics", label: "Analytics" },
-  { href: "/alerts", label: "Alerts" },
+  { href: "/alerts",    label: "Alerts"    },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const router   = useRouter();
   const { session, logout } = useAuth();
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#0f172a_0%,#00040e_58%)] text-slate-100">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8">
-        <header className="rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-4 shadow-2xl shadow-slate-950/60 backdrop-blur md:px-6">
+    <div className="min-h-screen text-[#e4e4f0]">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-5 px-4 py-5 md:px-8">
+
+        {/* Header */}
+        <header className="rounded-2xl border border-[#26263a] border-t-white/[0.06] bg-[#111118]/90 px-4 py-4 shadow-2xl shadow-black/70 backdrop-blur-md md:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-cyan-300">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-violet-400 font-semibold">
                 CCMS Command Console
               </p>
-              <h1 className="text-xl font-semibold text-slate-100">
+              <h1 className="text-xl font-bold text-white">
                 Streetlight Fleet Operations
               </h1>
             </div>
-            <div className="flex items-center gap-3 text-sm text-slate-300">
+            <div className="flex items-center gap-3">
               <Chip color="accent" size="sm" variant="soft">
                 {session?.role ?? "Viewer"}
               </Chip>
@@ -37,25 +39,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 variant="outline"
                 size="sm"
                 onPress={() => void logout()}
-                className="border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700"
+                className="border-[#26263a] bg-[#18181f] text-[#a0a0c0] hover:bg-[#1f1f2a] hover:text-white transition-colors"
               >
                 Logout
               </Button>
             </div>
           </div>
 
-          <nav className="mt-4 flex flex-wrap gap-2">
+          <nav className="mt-4 flex flex-wrap gap-1.5">
             {navItems.map((item) => {
-              const active =
-                pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <button
                   key={item.href}
                   onClick={() => router.push(item.href)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                     active
-                      ? "bg-cyan-500 text-slate-950"
-                      : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+                      ? "bg-violet-600 text-white shadow-[0_0_14px_rgba(124,58,237,0.5)]"
+                      : "bg-[#18181f] text-[#8080a0] hover:bg-[#1f1f2a] hover:text-[#e4e4f0]"
                   }`}
                 >
                   {item.label}
@@ -65,9 +66,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         </header>
 
-        <main className="flex-1 rounded-2xl border border-slate-800/80 bg-slate-900/65 p-4 shadow-xl shadow-slate-950/55 backdrop-blur md:p-6">
+        {/* Main */}
+        <main className="flex-1 rounded-2xl border border-[#26263a] border-t-white/[0.04] bg-[#111118]/80 p-4 shadow-xl shadow-black/60 backdrop-blur-sm md:p-6">
           {children}
         </main>
+
       </div>
     </div>
   );

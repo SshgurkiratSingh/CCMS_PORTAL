@@ -8,5 +8,6 @@ extern PubSubClient mqttClient;
 void setupMQTT();
 void handleMQTTConnection();
 void publishMqttData();
+void mqttCallback(char *topic, byte *payload, unsigned int length);
 
 #endif

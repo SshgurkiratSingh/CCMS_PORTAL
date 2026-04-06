@@ -3,13 +3,14 @@
 import { useMemo, useState, useEffect, Fragment } from "react";
 import { getPanelTelemetry, getPanels } from "@/lib/api/ccms-api";
 import registerMap from "@/lib/register-map.json";
-import type {
-  TelemetryResponse,
-  PanelRecord,
-} from "@/lib/api/types";
+import type { TelemetryResponse, PanelRecord } from "@/lib/api/types";
 import {
   LineChart,
   Line,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -24,6 +25,7 @@ import {
   Activity,
   Settings2,
   BarChart2,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Button, Card, Input } from "@heroui/react";
 import { ErrorBanner } from "@/components/ui";
@@ -43,7 +45,8 @@ function dateToEndIso(dateValue: string): string {
   return new Date(`${dateValue}T23:59:59.999Z`).toISOString();
 }
 
-type TabType = "chart" | "data" | "compare";
+type TabType = "chart" | "data" | "compare" | "custom";
+type CustomChartType = "line" | "area" | "bar";
 
 export default function AnalyticsPage() {
   const now = useMemo(() => new Date(), []);
@@ -75,6 +78,19 @@ export default function AnalyticsPage() {
   }, []);
 
   const [activeTab, setActiveTab] = useState<TabType>("chart");
+  const [customChartType, setCustomChartType] = useState<CustomChartType>("line");
+  const [customPanelId, setCustomPanelId] = useState<string>("");
+  const [customMetrics, setCustomMetrics] = useState<Record<string, boolean>>(
+    () => {
+      const initial: Record<string, boolean> = {};
+      registerMap.registers
+        .filter((r) => r.category !== "Control")
+        .forEach((reg) => {
+          initial[reg.id] = reg.id === "avgVoltage" || reg.id === "avgCurrent";
+        });
+      return initial;
+    },
+  );
 
   const mergedPoints = useMemo(() => {
     if (results.length === 0) return [];
@@ -120,6 +136,25 @@ export default function AnalyticsPage() {
       prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid],
     );
   };
+
+  useEffect(() => {
+    if (!customPanelId && selectedPanelIds.length > 0) {
+      setCustomPanelId(selectedPanelIds[0]);
+    }
+  }, [customPanelId, selectedPanelIds]);
+
+  const customPanelTelemetry = useMemo(() => {
+    const target = results.find((r) => r.panelId === customPanelId);
+    return target?.points ?? [];
+  }, [results, customPanelId]);
+
+  const selectedCustomMetricDefs = useMemo(
+    () =>
+      registerMap.registers.filter(
+        (reg) => reg.category !== "Control" && customMetrics[reg.id],
+      ),
+    [customMetrics],
+  );
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -285,7 +320,9 @@ export default function AnalyticsPage() {
                       className="rounded border-slate-700 bg-slate-950 text-indigo-500 focus:ring-indigo-500"
                     />
                     <div className="flex flex-col">
-                      <span className="text-sm text-slate-200">{p.panelId}</span>
+                      <span className="text-sm text-slate-200">
+                        {p.panelId}
+                      </span>
                       {p.name && p.name !== p.panelId && (
                         <span className="text-xs text-slate-500">{p.name}</span>
                       )}
@@ -302,7 +339,9 @@ export default function AnalyticsPage() {
           </label>
 
           <label className="text-sm font-medium">
-            <span className="block text-slate-400 mb-1.5">Start Date (UTC)</span>
+            <span className="block text-slate-400 mb-1.5">
+              Start Date (UTC)
+            </span>
             <Input
               required
               type="date"
@@ -373,6 +412,13 @@ export default function AnalyticsPage() {
               icon={<TableIcon className="h-4 w-4" />}
             >
               Raw Data
+            </TabButton>
+            <TabButton
+              active={activeTab === "custom"}
+              onClick={() => setActiveTab("custom")}
+              icon={<SlidersHorizontal className="h-4 w-4" />}
+            >
+              Custom Graph
             </TabButton>
           </div>
 
@@ -519,7 +565,9 @@ export default function AnalyticsPage() {
                 <thead className="bg-slate-900/80 text-left text-slate-400 font-medium">
                   <tr>
                     <th className="px-4 py-3 whitespace-nowrap">Panel ID</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Timestamp (UTC)</th>
+                    <th className="px-4 py-3 whitespace-nowrap">
+                      Timestamp (UTC)
+                    </th>
                     {registerMap.registers
                       .filter((r) => r.category !== "Control")
                       .map((reg) => (
@@ -543,16 +591,24 @@ export default function AnalyticsPage() {
                           {res.panelId}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-slate-400">
-                          {format(parseISO(point.timestampUtc), "yyyy-MM-dd HH:mm:ss")}
+                          {format(
+                            parseISO(point.timestampUtc),
+                            "yyyy-MM-dd HH:mm:ss",
+                          )}
                         </td>
                         {registerMap.registers
                           .filter((r) => r.category !== "Control")
                           .map((reg) => {
                             const val = point[reg.id as keyof typeof point];
                             return (
-                              <td key={reg.id} className="px-4 py-2 text-right font-mono">
+                              <td
+                                key={reg.id}
+                                className="px-4 py-2 text-right font-mono"
+                              >
                                 {typeof val === "number"
-                                  ? val.toFixed(reg.id.includes("Factor") ? 3 : 2)
+                                  ? val.toFixed(
+                                      reg.id.includes("Factor") ? 3 : 2,
+                                    )
                                   : String(val ?? "-")}
                               </td>
                             );
@@ -562,6 +618,163 @@ export default function AnalyticsPage() {
                   )}
                 </tbody>
               </table>
+            </Card>
+          )}
+
+          {activeTab === "custom" && (
+            <Card className="rounded-xl border border-slate-700 bg-slate-900/40 p-4 space-y-4">
+              <div className="grid gap-4 lg:grid-cols-3">
+                <label className="text-sm font-medium lg:col-span-1">
+                  <span className="block text-slate-400 mb-1.5">Panel</span>
+                  <select
+                    value={customPanelId}
+                    onChange={(e) => setCustomPanelId(e.target.value)}
+                    className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-cyan-500"
+                  >
+                    {results.map((res) => (
+                      <option key={res.panelId} value={res.panelId}>
+                        {res.panelId}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="lg:col-span-2">
+                  <span className="block text-sm text-slate-400 mb-1.5">Chart Type</span>
+                  <div className="flex flex-wrap gap-2">
+                    {(["line", "area", "bar"] as const).map((type) => (
+                      <Button
+                        key={type}
+                        size="sm"
+                        variant={customChartType === type ? "primary" : "secondary"}
+                        onPress={() => setCustomChartType(type)}
+                        className="capitalize"
+                      >
+                        {type}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-slate-950/50 border border-slate-800 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                  Select Metrics
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {registerMap.registers
+                    .filter((r) => r.category !== "Control")
+                    .map((reg) => (
+                      <Toggle
+                        key={reg.id}
+                        label={reg.name}
+                        checked={!!customMetrics[reg.id]}
+                        onChange={(checked) =>
+                          setCustomMetrics((prev) => ({ ...prev, [reg.id]: checked }))
+                        }
+                        color={`bg-[${reg.chartColor}]`}
+                      />
+                    ))}
+                </div>
+              </div>
+
+              {customPanelTelemetry.length === 0 || selectedCustomMetricDefs.length === 0 ? (
+                <div className="rounded-lg border border-slate-800 bg-slate-950/30 p-8 text-center text-slate-400 text-sm">
+                  {customPanelTelemetry.length === 0
+                    ? "No telemetry points for selected panel. Run query or pick another panel."
+                    : "Select at least one metric to plot."}
+                </div>
+              ) : (
+                <div className="h-105 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {customChartType === "line" ? (
+                      <LineChart data={customPanelTelemetry} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                        <XAxis
+                          dataKey="timestampUtc"
+                          tickFormatter={formatTimeXAxis}
+                          stroke="#94a3b8"
+                          fontSize={12}
+                          minTickGap={50}
+                        />
+                        <YAxis stroke="#94a3b8" fontSize={12} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px" }}
+                          itemStyle={{ color: "#e2e8f0" }}
+                        />
+                        <Legend />
+                        {selectedCustomMetricDefs.map((reg) => (
+                          <Line
+                            key={reg.id}
+                            type="monotone"
+                            dataKey={reg.id}
+                            name={reg.name}
+                            stroke={reg.chartColor}
+                            strokeWidth={2}
+                            dot={false}
+                            connectNulls
+                          />
+                        ))}
+                      </LineChart>
+                    ) : customChartType === "area" ? (
+                      <AreaChart data={customPanelTelemetry} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                        <XAxis
+                          dataKey="timestampUtc"
+                          tickFormatter={formatTimeXAxis}
+                          stroke="#94a3b8"
+                          fontSize={12}
+                          minTickGap={50}
+                        />
+                        <YAxis stroke="#94a3b8" fontSize={12} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px" }}
+                          itemStyle={{ color: "#e2e8f0" }}
+                        />
+                        <Legend />
+                        {selectedCustomMetricDefs.map((reg) => (
+                          <Area
+                            key={reg.id}
+                            type="monotone"
+                            dataKey={reg.id}
+                            name={reg.name}
+                            stroke={reg.chartColor}
+                            fill={reg.chartColor}
+                            fillOpacity={0.18}
+                            connectNulls
+                          />
+                        ))}
+                      </AreaChart>
+                    ) : (
+                      <BarChart data={customPanelTelemetry} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                        <XAxis
+                          dataKey="timestampUtc"
+                          tickFormatter={formatTimeXAxis}
+                          stroke="#94a3b8"
+                          fontSize={12}
+                          minTickGap={50}
+                        />
+                        <YAxis stroke="#94a3b8" fontSize={12} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px" }}
+                          itemStyle={{ color: "#e2e8f0" }}
+                        />
+                        <Legend />
+                        {selectedCustomMetricDefs.map((reg) => (
+                          <Bar
+                            key={reg.id}
+                            dataKey={reg.id}
+                            name={reg.name}
+                            fill={reg.chartColor}
+                            radius={[3, 3, 0, 0]}
+                          />
+                        ))}
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+              )}
             </Card>
           )}
         </div>
@@ -623,7 +836,10 @@ function MultiChartCard({
       <h3 className="mb-4 text-sm font-medium text-slate-300">{title}</h3>
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+          <LineChart
+            data={data}
+            margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
+          >
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="#334155"

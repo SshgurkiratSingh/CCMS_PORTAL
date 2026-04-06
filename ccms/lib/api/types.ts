@@ -31,7 +31,15 @@ export type PanelListResponse = {
 
 export type PanelLiveStatus = {
   panelId: string;
+  clientId?: string;
+  timestamp?: number;
   reportedAtUtc: string;
+  batteryVoltage: number;
+  mainsVoltageRaw: number;
+  mainsStatus: "ON" | "OFF" | string;
+  tiltSwitch: number;
+  temperature: number;
+  r3003: number;
   // Schneider Meter Variables
   phase1Voltage: number;    // R3027
   avgVoltage: number;       // R3035
@@ -63,6 +71,14 @@ export type PanelCommandResult = {
 
 export type TelemetryPoint = {
   timestampUtc: string;
+  timestamp?: number;
+  clientId?: string;
+  batteryVoltage: number;
+  mainsVoltageRaw: number;
+  mainsStatus?: "ON" | "OFF" | string;
+  tiltSwitch: number;
+  temperature: number;
+  r3003: number;
   phase1Voltage: number;    // R3027
   avgVoltage: number;       // R3035
   gridFrequency: number;    // R3109

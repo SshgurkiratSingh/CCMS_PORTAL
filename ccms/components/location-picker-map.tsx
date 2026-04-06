@@ -9,14 +9,23 @@ import L from "leaflet";
 
 const defaultIcon = new L.Icon({
   iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png`,
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41],
 });
 
-function LocationMarker({ lat, lng, setPosition }: { lat: number, lng: number, setPosition: (lat: number, lng: number) => void }) {
+function LocationMarker({
+  lat,
+  lng,
+  setPosition,
+}: {
+  lat: number;
+  lng: number;
+  setPosition: (lat: number, lng: number) => void;
+}) {
   const map = useMapEvents({
     click(e) {
       setPosition(e.latlng.lat, e.latlng.lng);
@@ -25,7 +34,7 @@ function LocationMarker({ lat, lng, setPosition }: { lat: number, lng: number, s
 
   useEffect(() => {
     if (lat && lng) {
-        map.flyTo([lat, lng], map.getZoom());
+      map.flyTo([lat, lng], map.getZoom());
     }
   }, [lat, lng, map]);
 
@@ -45,9 +54,10 @@ export default function LocationPickerMap({
   onChange: (lat: number, lng: number) => void;
   className?: string;
 }) {
-  const position: [number, number] = (lat && lng) ? [lat, lng] : [20.5937, 78.9629]; // Default to India roughly
-  const zoom = (lat && lng) ? 14 : 4;
-  
+  const position: [number, number] =
+    lat && lng ? [lat, lng] : [20.5937, 78.9629]; // Default to India roughly
+  const zoom = lat && lng ? 14 : 4;
+
   return (
     <div className={className}>
       <MapContainer

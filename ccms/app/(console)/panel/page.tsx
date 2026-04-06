@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -10,47 +10,32 @@ import {
   getPanelTelemetry,
   getPanels,
 } from "@/lib/api/ccms-api";
-import type {
-  PanelLiveStatus,
-  TelemetryPoint,
-  PanelRecord,
-} from "@/lib/api/types";
+import type { PanelLiveStatus, TelemetryPoint, PanelRecord } from "@/lib/api/types";
 import registerMap from "@/lib/register-map.json";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
-  Activity,
-  ArrowLeft,
-  Zap,
-  Power,
-  Settings2,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  History,
-  BarChart2,
-  Edit,
-  MapPin,
+  Activity, ArrowLeft, Zap, Power, Settings2, AlertTriangle,
+  CheckCircle2, Clock, History, Edit, MapPin, RefreshCw,
 } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { Button, Card, Input } from "@heroui/react";
-import { ErrorBanner, SuccessBanner, WarningBanner } from "@/components/ui";
+import { ErrorBanner, SuccessBanner, WarningBanner, PanelStatusChip } from "@/components/ui";
 
 const FleetMap = dynamic(() => import("@/components/fleet-map"), {
   ssr: false,
   loading: () => (
-    <div className="h-full min-h-75 w-full rounded-xl border border-slate-700 bg-slate-900/40 flex items-center justify-center text-slate-500">
-      <Activity className="animate-spin h-6 w-6 mr-2" /> Loading Spatial Maps...
+    <div className="h-full min-h-64 w-full flex items-center justify-center text-slate-500 text-sm gap-2">
+      <Activity className="animate-spin h-5 w-5" /> Loading map...
     </div>
   ),
 });
+
+const TELEMETRY_REGISTERS = registerMap.registers.filter((r) => r.category !== "Control");
+const CHART_REGISTERS = TELEMETRY_REGISTERS.filter(
+  (r) => (r.priority === "high" || r.priority === "medium") && r.id !== "phase1Voltage"
+).slice(0, 4);
 
 export default function PanelDetailsPage() {
   const searchParams = useSearchParams();
@@ -59,295 +44,280 @@ export default function PanelDetailsPage() {
   const [status, setStatus] = useState<PanelLiveStatus | null>(null);
   const [telemetry, setTelemetry] = useState<TelemetryPoint[]>([]);
   const [panelInfo, setPanelInfo] = useState<PanelRecord | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const [timeRange, setTimeRange] = useState<"1H" | "24H" | "7D">("1H");
   const [manualState, setManualState] = useState<"ON" | "OFF">("ON");
   const [scheduleStart, setScheduleStart] = useState("18:00");
   const [scheduleEnd, setScheduleEnd] = useState("06:00");
+  const [dispatching, setDispatching] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!panelId) return;
-
+    setLoading(true);
     try {
       const endUtc = new Date();
       const startUtc = new Date();
       if (timeRange === "1H") startUtc.setHours(startUtc.getHours() - 1);
       else if (timeRange === "24H") startUtc.setHours(startUtc.getHours() - 24);
-      else if (timeRange === "7D") startUtc.setDate(startUtc.getDate() - 7);
+      else startUtc.setDate(startUtc.getDate() - 7);
 
       const [nextStatus, nextTelemetry, panelsResponse] = await Promise.all([
         getPanelStatus(panelId),
-        getPanelTelemetry({
-          panelId,
-          startUtcIso: startUtc.toISOString(),
-          endUtcIso: endUtc.toISOString(),
-        }),
+        getPanelTelemetry({ panelId, startUtcIso: startUtc.toISOString(), endUtcIso: endUtc.toISOString() }),
         getPanels({ limit: 1000 }),
       ]);
 
       setStatus(nextStatus);
-
-      // Locate this specific panel for mapping
-      const p = panelsResponse.items.find((x) => x.panelId === panelId);
-      setPanelInfo(p || null);
-
-      // Sort telemetry strictly chronologically for charts
-      const sortedPts = nextTelemetry.points.sort(
-        (a, b) =>
-          new Date(a.timestampUtc).getTime() -
-          new Date(b.timestampUtc).getTime(),
+      setPanelInfo(panelsResponse.items.find((x) => x.panelId === panelId) ?? null);
+      setTelemetry(
+        nextTelemetry.points.sort(
+          (a, b) => new Date(a.timestampUtc).getTime() - new Date(b.timestampUtc).getTime()
+        )
       );
-      setTelemetry(sortedPts);
-
       setError(null);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Unable to fetch live panel data.",
-      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to fetch live panel data.");
+    } finally {
+      setLoading(false);
     }
   }, [panelId, timeRange]);
 
   useEffect(() => {
     if (!panelId) return;
-
     void loadData();
-    const timer = setInterval(() => {
-      void loadData();
-    }, 30000); // 30s refresh for wider intervals
-
+    const timer = setInterval(() => void loadData(), 30_000);
     return () => clearInterval(timer);
   }, [loadData, panelId, timeRange]);
 
   const sendManualCommand = async () => {
-    if (!panelId) {
-      setError("Missing panel id in URL. Use /panel?id=<panelId>.");
-      return;
-    }
-
+    if (!panelId) return;
+    setDispatching(true);
     try {
-      const result = await postPanelCommand(panelId, {
-        action: "SET_MANUAL_STATE",
-        manualState,
-      });
-      setMessage(`Command accepted: ${result.requestId}`);
+      const result = await postPanelCommand(panelId, { action: "SET_MANUAL_STATE", manualState });
+      setMessage(`Relay ${manualState} dispatched — request ${result.requestId}`);
       setError(null);
-    } catch (commandError) {
-      setError(
-        commandError instanceof Error
-          ? commandError.message
-          : "Manual command failed.",
-      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Manual command failed.");
+    } finally {
+      setDispatching(false);
     }
   };
 
   const sendScheduleCommand = async () => {
-    if (!panelId) {
-      setError("Missing panel id in URL. Use /panel?id=<panelId>.");
-      return;
-    }
-
+    if (!panelId) return;
+    setDispatching(true);
     try {
       const result = await postPanelCommand(panelId, {
         action: "UPDATE_RTC_SCHEDULE",
-        schedule: {
-          startLocalTime: scheduleStart,
-          endLocalTime: scheduleEnd,
-        },
+        schedule: { startLocalTime: scheduleStart, endLocalTime: scheduleEnd },
       });
-      setMessage(`Schedule updated: ${result.requestId}`);
+      setMessage(`RTC schedule synced — request ${result.requestId}`);
       setError(null);
-    } catch (commandError) {
-      setError(
-        commandError instanceof Error
-          ? commandError.message
-          : "Schedule command failed.",
-      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Schedule command failed.");
+    } finally {
+      setDispatching(false);
     }
   };
 
-  // Automated Insights logic
-  const insights = [];
+  // Insights
+  const insights: { type: "ok" | "warning"; text: string }[] = [];
   if (status) {
-    if (status.avgVoltage < 210) {
-      insights.push({
-        type: "warning",
-        text: `Low Voltage Detected: ${status.avgVoltage.toFixed(1)}V (Under 210V threshold)`,
-      });
-    } else if (status.avgVoltage > 250) {
-      insights.push({
-        type: "warning",
-        text: `Over Voltage Detected: ${status.avgVoltage.toFixed(1)}V (Over 250V threshold)`,
-      });
-    } else {
-      insights.push({
-        type: "ok",
-        text: `Grid voltage optimal at ${status.avgVoltage.toFixed(1)}V`,
-      });
-    }
+    if (status.avgVoltage < 210)
+      insights.push({ type: "warning", text: `Low voltage: ${status.avgVoltage.toFixed(1)} V (< 210 V)` });
+    else if (status.avgVoltage > 250)
+      insights.push({ type: "warning", text: `Over voltage: ${status.avgVoltage.toFixed(1)} V (> 250 V)` });
+    else
+      insights.push({ type: "ok", text: `Voltage nominal at ${status.avgVoltage.toFixed(1)} V` });
 
-    if (status.totalPowerFactor < 0.85) {
-      insights.push({
-        type: "warning",
-        text: `Poor Power Factor: ${status.totalPowerFactor.toFixed(2)}. Suggests heavy reactive load.`,
-      });
-    } else {
-      insights.push({
-        type: "ok",
-        text: `Power factor is stable (${status.totalPowerFactor.toFixed(2)})`,
-      });
-    }
+    if (status.totalPowerFactor < 0.85)
+      insights.push({ type: "warning", text: `Poor power factor: ${status.totalPowerFactor.toFixed(2)} (< 0.85)` });
+    else
+      insights.push({ type: "ok", text: `Power factor stable at ${status.totalPowerFactor.toFixed(2)}` });
 
-    if (status.gridFrequency < 49.5 || status.gridFrequency > 50.5) {
-      insights.push({
-        type: "warning",
-        text: `Grid frequency unstable: ${status.gridFrequency.toFixed(2)}Hz`,
-      });
-    }
+    if (status.gridFrequency < 49.5 || status.gridFrequency > 50.5)
+      insights.push({ type: "warning", text: `Frequency unstable: ${status.gridFrequency.toFixed(2)} Hz` });
+    else
+      insights.push({ type: "ok", text: `Grid frequency stable at ${status.gridFrequency.toFixed(2)} Hz` });
   }
 
-  const formatTimeXAxis = (tickItem: string) => {
-    try {
-      return format(parseISO(tickItem), "HH:mm:ss");
-    } catch {
-      return tickItem;
-    }
-  };
+  const hasWarning = insights.some((i) => i.type === "warning");
 
   return (
-    <section className="space-y-6 pb-12">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
+    <section className="space-y-5 pb-12">
+
+      {/* ── Page header ── */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+        <div className="space-y-2">
           <Link
             href="/panels"
-            className="inline-flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors mb-2 font-medium"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
           >
-            <ArrowLeft className="h-4 w-4" /> Back to Fleet
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Fleet
           </Link>
-          <div className="flex items-center gap-3">
-            <h2 className="text-3xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
-              <Activity className="h-7 w-7 text-emerald-400 animate-pulse" />
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-2xl font-bold tracking-tight text-slate-50">
               Node Dashboard
             </h2>
-            <div className="px-3 py-1 rounded bg-slate-800/80 border border-slate-700 text-sm font-mono text-slate-300 shadow-inner">
-              {panelId || "No ID"}
-            </div>
+            <code className="px-2.5 py-1 rounded-md bg-slate-800/80 border border-slate-700/80 text-sm font-mono text-cyan-300">
+              {panelId || "—"}
+            </code>
+            {panelInfo && <PanelStatusChip status={panelInfo.status} />}
             {panelId && (
               <Link
                 href={`/manage-panel?id=${panelId}`}
-                className="ml-2 px-3 py-1 rounded flex items-center gap-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs text-slate-300 transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/70 border border-slate-700/60 text-xs text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
               >
-                <Edit className="h-3 w-3" /> Edit Node
+                <Edit className="h-3 w-3" /> Edit
               </Link>
             )}
           </div>
+          {panelInfo && (
+            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+              {status?.clientId && (
+                <span>
+                  Client <span className="font-mono text-slate-300">{status.clientId}</span>
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {panelInfo.name !== panelInfo.panelId ? panelInfo.name : `${panelInfo.gpsLat.toFixed(4)}, ${panelInfo.gpsLng.toFixed(4)}`}
+              </span>
+              <span>FW v{panelInfo.firmwareVersion}</span>
+              <span>
+                Last seen{" "}
+                {formatDistanceToNow(parseISO(panelInfo.lastSeenUtc), { addSuffix: true })}
+              </span>
+            </div>
+          )}
         </div>
 
-        {status && (
-          <div className="flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <span className="relative flex h-2 w-2 mr-1">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            LIVE DATA ACTIVE
-          </div>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {status && (
+            <div className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              Live
+            </div>
+          )}
+          <Button
+            size="sm"
+            variant="secondary"
+            onPress={() => void loadData()}
+            isDisabled={loading}
+            className="flex items-center gap-1.5"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {!panelId && <WarningBanner message="Open this page as /panel?id=your-panel-id." />}
       {error && <ErrorBanner message={error} />}
       {message && <SuccessBanner message={message} />}
 
-      {/* Real-time Insights Panel */}
+      {/* ── Insights strip ── */}
       {insights.length > 0 && (
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div className={`flex flex-wrap gap-2 rounded-xl border p-3 ${hasWarning ? "border-amber-800/40 bg-amber-950/15" : "border-emerald-800/30 bg-emerald-950/10"}`}>
           {insights.map((insight, idx) => (
-            <div
-              key={idx}
-              className={`rounded-xl border p-4 flex gap-3 ${
-                insight.type === "warning"
-                  ? "bg-amber-950/20 border-amber-900/50"
-                  : "bg-emerald-950/10 border-emerald-900/30"
-              }`}
-            >
-              <div className="mt-0.5">
-                {insight.type === "warning" ? (
-                  <AlertTriangle className="h-5 w-5 text-amber-500" />
-                ) : (
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                )}
-              </div>
-              <p
-                className={`text-sm ${insight.type === "warning" ? "text-amber-200/90" : "text-emerald-200/80"}`}
-              >
+            <div key={idx} className="flex items-center gap-1.5 text-xs">
+              {insight.type === "warning"
+                ? <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
+              <span className={insight.type === "warning" ? "text-amber-300" : "text-emerald-300"}>
                 {insight.text}
-              </p>
+              </span>
+              {idx < insights.length - 1 && <span className="ml-2 text-slate-700">·</span>}
             </div>
           ))}
         </div>
       )}
 
-      {/* Primary KPI Grid (Current Snapshot) */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
-        {registerMap.registers
-          .filter((r) => r.category !== "Control")
-          .map((reg) => {
-            let valStr = "-";
-            let isActive = false;
-            let isHighlight = reg.id.includes("Current");
+      {status && (
+        <Card className="rounded-xl border border-slate-800/70 bg-slate-900/40 p-3">
+          <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+            <div>
+              <p className="text-slate-500 uppercase tracking-wide">Mains Status</p>
+              <p className={status.mainsStatus === "ON" ? "font-semibold text-emerald-400" : "font-semibold text-rose-400"}>
+                {status.mainsStatus}
+              </p>
+            </div>
+            <div>
+              <p className="text-slate-500 uppercase tracking-wide">Tilt Switch</p>
+              <p className={status.tiltSwitch > 0 ? "font-semibold text-amber-400" : "font-semibold text-slate-300"}>
+                {status.tiltSwitch > 0 ? "TRIGGERED" : "NORMAL"}
+              </p>
+            </div>
+            <div>
+              <p className="text-slate-500 uppercase tracking-wide">Battery</p>
+              <p className="font-semibold text-slate-200">{status.batteryVoltage.toFixed(2)} V</p>
+            </div>
+            <div>
+              <p className="text-slate-500 uppercase tracking-wide">Temperature</p>
+              <p className="font-semibold text-slate-200">{status.temperature.toFixed(1)} C</p>
+            </div>
+          </div>
+        </Card>
+      )}
 
-            if (status) {
-              const v = status[reg.id as keyof typeof status];
-              if (v !== undefined) {
-                const numV = Number(v);
-                valStr =
-                  `${numV.toFixed(reg.id.includes("Factor") ? 3 : 1)} ${reg.unit}`.trim();
+      {/* ── KPI snapshot ── */}
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
+        {TELEMETRY_REGISTERS.map((reg) => {
+          let valStr = "—";
+          let isAlert = false;
+          const isHighlight = reg.category === "Current";
 
-                if (reg.id.includes("Voltage") && (numV > 250 || numV < 210))
-                  isActive = true;
-                if (reg.id.includes("PowerFactor") && numV < 0.85)
-                  isActive = true;
-              }
+          if (status) {
+            const v = status[reg.id as keyof typeof status];
+            if (v !== undefined) {
+              const n = Number(v);
+              valStr = `${n.toFixed(reg.id.includes("Factor") ? 3 : 1)}${reg.unit ? ` ${reg.unit}` : ""}`;
+              if (reg.category === "Voltage" && (n > 250 || n < 210)) isAlert = true;
+              if (reg.id === "totalPowerFactor" && n < 0.85) isAlert = true;
             }
-            return (
-              <StatBox
-                key={reg.id}
-                label={reg.name}
-                value={valStr}
-                active={isActive}
-                highlight={isHighlight}
-              />
-            );
-          })}
+          }
+
+          return (
+            <StatBox
+              key={reg.id}
+              label={reg.name}
+              value={valStr}
+              color={reg.chartColor}
+              alert={isAlert}
+              highlight={isHighlight}
+              loading={loading && !status}
+            />
+          );
+        })}
       </div>
 
-      <div className="flex justify-end pr-1 -mt-4">
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <Clock className="h-3 w-3" /> Reported:{" "}
-          {status?.reportedAtUtc
-            ? format(parseISO(status.reportedAtUtc), "PP pp : ss")
-            : "Awaiting shadow read"}
-        </div>
+      <div className="flex items-center justify-end gap-1.5 text-xs text-slate-500 -mt-1">
+        <Clock className="h-3 w-3" />
+        {status?.reportedAtUtc
+          ? <>Reported {format(parseISO(status.reportedAtUtc), "dd MMM, HH:mm:ss")} UTC</>
+          : "Awaiting shadow read"}
       </div>
 
-      {/* Live Charts */}
-      <div className="space-y-4 pt-4 border-t border-slate-800">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="font-semibold text-lg flex items-center gap-2 text-slate-200">
-            <History className="h-5 w-5 text-indigo-400" /> Historical Feed &
-            Analytics
+      {/* ── Historical charts ── */}
+      <div className="space-y-4 pt-4 border-t border-slate-800/80">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h3 className="font-semibold text-base flex items-center gap-2 text-slate-200">
+            <History className="h-4 w-4 text-indigo-400" /> Historical Feed
           </h3>
-          <div className="flex items-center gap-2 bg-slate-900/50 p-1 rounded-lg border border-slate-800">
+          <div className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-lg border border-slate-800/80">
             {(["1H", "24H", "7D"] as const).map((range) => (
               <Button
                 key={range}
                 size="sm"
                 variant={timeRange === range ? "primary" : "ghost"}
                 onPress={() => setTimeRange(range)}
-                className="px-4 text-xs font-semibold"
+                className={`px-3 text-xs font-semibold min-w-10 ${timeRange === range ? "text-slate-950" : "text-slate-300 hover:text-slate-100"}`}
               >
                 {range}
               </Button>
@@ -358,83 +328,85 @@ export default function PanelDetailsPage() {
         {telemetry.length > 0 ? (
           <>
             <IntervalInsights data={telemetry} />
-            <div className="grid gap-4 lg:grid-cols-2 mt-4">
-              {registerMap.registers
-                .filter(
-                  (r) =>
-                    r.category !== "Control" &&
-                    (r.priority === "high" || r.priority === "medium") &&
-                    r.id !== "phase1Voltage",
-                )
-                .slice(0, 4) // restrict to 4 main charts for layout
-                .map((reg) => (
-                  <LiveChartCard
-                    key={reg.id}
-                    title={reg.name}
-                    data={telemetry}
-                    dataKey={reg.id as keyof TelemetryPoint}
-                    color={reg.chartColor}
-                    unit={reg.unit}
-                    domain={
-                      reg.id.includes("Voltage")
-                        ? [200, 260]
-                        : reg.id.includes("Frequency")
-                          ? [49, 51]
-                          : reg.id.includes("PowerFactor")
-                            ? [0, 1.1]
-                            : undefined
-                    }
-                  />
-                ))}
+            <div className="grid gap-4 lg:grid-cols-2">
+              {CHART_REGISTERS.map((reg) => (
+                <LiveChartCard
+                  key={reg.id}
+                  title={reg.name}
+                  data={telemetry}
+                  dataKey={reg.id as keyof TelemetryPoint}
+                  color={reg.chartColor}
+                  unit={reg.unit}
+                  domain={
+                    reg.id.includes("Voltage") ? [200, 260]
+                    : reg.id.includes("Frequency") ? [49, 51]
+                    : reg.id.includes("PowerFactor") ? [0, 1.1]
+                    : undefined
+                  }
+                />
+              ))}
             </div>
           </>
         ) : (
-          <div className="py-12 text-center border border-slate-800 border-dashed rounded-xl bg-slate-900/20 text-slate-500">
-            No historical data found for this period.
+          <div className="py-14 text-center border border-slate-800/60 border-dashed rounded-xl bg-slate-900/20 text-slate-500 text-sm">
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Activity className="h-4 w-4 animate-spin" /> Loading telemetry...
+              </span>
+            ) : (
+              "No historical data found for this period."
+            )}
           </div>
         )}
       </div>
 
-      {/* Control Surface & Map */}
-      <div className="grid gap-4 lg:grid-cols-3 pt-6 border-t border-slate-800">
-        {/* Controls container - span 2 cols on lg, then 2 inner cols */}
+      {/* ── Controls + Map ── */}
+      <div className="grid gap-4 lg:grid-cols-3 pt-5 border-t border-slate-800/80">
         <div className="lg:col-span-2 grid gap-4 sm:grid-cols-2">
-          {/* Relay Control */}
-          <Card className="rounded-xl border border-slate-700 bg-slate-900/40 p-5 shadow-lg relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Power className="h-24 w-24 text-slate-400" />
+
+          {/* Relay control */}
+          <Card className="rounded-xl border border-slate-700/80 bg-slate-900/50 p-5 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-[0.06] group-hover:opacity-[0.12] transition-opacity pointer-events-none">
+              <Power className="h-24 w-24 text-cyan-300" />
             </div>
-            <h3 className="font-bold text-lg text-slate-200 flex items-center gap-2">
-              <Zap className="h-5 w-5 text-cyan-400" /> Relay Control
-            </h3>
-            <p className="mt-1 text-sm text-slate-400 max-w-[80%]">
-              Writes to device shadow over secure MQTT connection. Actuation
-              usually takes ~2s.
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="h-4 w-4 text-cyan-400" />
+              <h3 className="font-semibold text-slate-100">Relay Control</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-5">
+              Writes to device shadow via MQTT. Actuation typically takes ~2 s.
             </p>
 
-            <div className="mt-6 flex items-center gap-3 relative z-10">
-              <div className="flex items-center rounded-md border border-slate-700 bg-slate-950 p-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={manualState === "ON" ? "primary" : "ghost"}
-                  onPress={() => setManualState("ON")}
+            <div className="flex items-center gap-3 relative z-10">
+              <div className="flex rounded-lg border border-slate-700 bg-slate-950 p-1 gap-1">
+                <button
+                  onClick={() => setManualState("ON")}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    manualState === "ON"
+                      ? "bg-emerald-500 text-slate-950 shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
                 >
-                  Relay ON
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={manualState === "OFF" ? "danger" : "ghost"}
-                  onPress={() => setManualState("OFF")}
+                  ON
+                </button>
+                <button
+                  onClick={() => setManualState("OFF")}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    manualState === "OFF"
+                      ? "bg-rose-500 text-white shadow-sm"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
                 >
-                  Relay OFF
-                </Button>
+                  OFF
+                </button>
               </div>
               <Button
-                type="button"
+                size="sm"
                 variant="primary"
                 onPress={() => void sendManualCommand()}
+                isDisabled={dispatching}
+                isPending={dispatching}
+                className="flex items-center gap-1.5"
               >
                 Dispatch
               </Button>
@@ -442,45 +414,43 @@ export default function PanelDetailsPage() {
           </Card>
 
           {/* RTC Schedule */}
-          <Card className="rounded-xl border border-slate-700 bg-slate-900/40 p-5 shadow-lg relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Settings2 className="h-24 w-24 text-slate-400" />
+          <Card className="rounded-xl border border-slate-700/80 bg-slate-900/50 p-5 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-[0.06] group-hover:opacity-[0.12] transition-opacity pointer-events-none">
+              <Settings2 className="h-24 w-24 text-purple-300" />
             </div>
-            <h3 className="font-bold text-lg text-slate-200 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-purple-400" /> RTC Schedule
-            </h3>
-            <p className="mt-1 text-sm text-slate-400 max-w-[80%]">
-              Set local chron-job configuration. Device will auto-actuate on
-              daily intervals.
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="h-4 w-4 text-purple-400" />
+              <h3 className="font-semibold text-slate-100">RTC Schedule</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-5">
+              Device auto-actuates on daily intervals using onboard RTC.
             </p>
 
-            <div className="mt-6 flex flex-wrap items-end gap-3 relative z-10 text-sm">
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Enable
-                </span>
+            <div className="flex flex-wrap items-end gap-3 relative z-10">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Enable at</span>
                 <Input
                   type="time"
                   variant="secondary"
                   value={scheduleStart}
-                  onChange={(event) => setScheduleStart(event.target.value)}
+                  onChange={(e) => setScheduleStart(e.target.value)}
                 />
               </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Disable
-                </span>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Disable at</span>
                 <Input
                   type="time"
                   variant="secondary"
                   value={scheduleEnd}
-                  onChange={(event) => setScheduleEnd(event.target.value)}
+                  onChange={(e) => setScheduleEnd(e.target.value)}
                 />
               </label>
               <Button
-                type="button"
+                size="sm"
                 variant="secondary"
                 onPress={() => void sendScheduleCommand()}
+                isDisabled={dispatching}
+                isPending={dispatching}
               >
                 Sync RTC
               </Button>
@@ -488,28 +458,28 @@ export default function PanelDetailsPage() {
           </Card>
         </div>
 
-        {/* Map Container */}
-        <Card className="lg:col-span-1 rounded-xl border border-slate-700 bg-slate-900/40 shadow-lg flex flex-col relative overflow-hidden">
-          <div className="p-4 border-b border-slate-800 bg-slate-900 flex justify-between items-center z-10">
-            <h3 className="font-bold text-lg text-slate-200 flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-rose-400" /> Geography
-            </h3>
+        {/* Map */}
+        <Card className="rounded-xl border border-slate-700/80 bg-slate-900/50 overflow-hidden flex flex-col min-h-56">
+          <div className="px-4 py-3 border-b border-slate-800/80 flex items-center justify-between shrink-0">
+            <span className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+              <MapPin className="h-4 w-4 text-rose-400" /> Geography
+            </span>
             {panelInfo && (
-              <span className="text-xs font-mono text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+              <span className="text-[10px] font-mono text-slate-500">
                 {panelInfo.gpsLat.toFixed(4)}, {panelInfo.gpsLng.toFixed(4)}
               </span>
             )}
           </div>
-          <div className="flex-1 bg-slate-950 min-h-75 relative">
+          <div className="flex-1 relative bg-slate-950 min-h-48">
             {panelInfo ? (
               <FleetMap
                 panels={[panelInfo]}
-                className="absolute inset-0 h-full w-full rounded-none border-none shadow-none z-0"
+                className="absolute inset-0 h-full w-full rounded-none border-none shadow-none"
               />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-slate-500 flex-col gap-2">
-                <Activity className="h-6 w-6 animate-spin opacity-50" />
-                <span className="text-sm">Mapping coordinates...</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-500 text-sm">
+                <Activity className="h-5 w-5 animate-spin opacity-40" />
+                Locating node...
               </div>
             )}
           </div>
@@ -518,123 +488,85 @@ export default function PanelDetailsPage() {
     </section>
   );
 }
-function StatBox({
-  label,
-  value,
-  highlight,
-  active,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-  active?: boolean;
-}) {
-  const bg = active
-    ? "bg-rose-950/40 border-rose-800/50"
-    : highlight
-      ? "bg-cyan-950/20 border-cyan-900/40"
-      : "bg-slate-900/60 border-slate-700/60";
-  const labelColor = active ? "text-rose-400/80" : "text-slate-400";
-  const valColor = active
-    ? "text-rose-300 font-bold"
-    : highlight
-      ? "text-cyan-300 font-bold"
-      : "text-slate-100 font-semibold";
 
+// ── StatBox ───────────────────────────────────────────────────────────────────
+function StatBox({
+  label, value, color, alert, highlight, loading,
+}: {
+  label: string; value: string; color: string;
+  alert?: boolean; highlight?: boolean; loading?: boolean;
+}) {
   return (
     <Card
-      className={`rounded-xl border p-4 transition-all duration-300 flex flex-col justify-center ${bg} ${active ? "animate-pulse" : ""}`}
+      className={`rounded-xl border p-4 flex flex-col gap-1 transition-all ${
+        alert
+          ? "border-rose-700/50 bg-rose-950/30 animate-pulse"
+          : highlight
+          ? "border-slate-700/60 bg-slate-900/60"
+          : "border-slate-800/60 bg-slate-900/40"
+      }`}
     >
-      <p
-        className={`text-[10px] uppercase tracking-wider font-semibold mb-1 ${labelColor}`}
-      >
+      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 truncate">
         {label}
       </p>
-      <p className={`text-xl font-mono ${valColor}`}>{value}</p>
+      {loading ? (
+        <div className="h-6 w-16 rounded bg-slate-800 animate-pulse mt-0.5" />
+      ) : (
+        <p
+          className="text-lg font-bold font-mono"
+          style={{ color: alert ? "#fca5a5" : color }}
+        >
+          {value}
+        </p>
+      )}
     </Card>
   );
 }
 
+// ── LiveChartCard ─────────────────────────────────────────────────────────────
 function LiveChartCard({
-  title,
-  data,
-  dataKey,
-  color,
-  unit,
-  domain,
+  title, data, dataKey, color, unit, domain,
 }: {
-  title: string;
-  data: TelemetryPoint[];
-  dataKey: keyof TelemetryPoint;
-  color: string;
-  unit: string;
-  domain?: [number, number];
+  title: string; data: TelemetryPoint[]; dataKey: keyof TelemetryPoint;
+  color: string; unit: string; domain?: [number, number];
 }) {
-  const currentVal =
-    data.length > 0 ? (data[data.length - 1] as any)[dataKey] : null;
-  const valDisplay =
-    currentVal !== null && currentVal !== undefined
-      ? Number(currentVal).toFixed(2)
-      : "-";
+  const last = data.length > 0 ? (data[data.length - 1] as Record<string, unknown>)[dataKey as string] : null;
+  const valDisplay = last != null ? Number(last).toFixed(2) : "—";
 
   return (
-    <Card className="rounded-xl border border-slate-700 bg-slate-900/30 p-4 flex flex-col">
-      <div className="flex justify-between items-center mb-4 border-b border-slate-800/60 pb-2">
-        <h3 className="text-sm font-semibold text-slate-300">{title}</h3>
+    <Card className="rounded-xl border border-slate-700/70 bg-slate-900/40 p-4 flex flex-col">
+      <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-800/60">
+        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{title}</h3>
         <div className="flex items-baseline gap-1">
-          <span className="text-lg font-bold" style={{ color }}>
-            {valDisplay}
-          </span>
-          <span className="text-xs text-slate-500">{unit}</span>
+          <span className="text-xl font-bold font-mono" style={{ color }}>{valDisplay}</span>
+          {unit && <span className="text-xs text-slate-500">{unit}</span>}
         </div>
       </div>
-
-      <div className="h-40 w-full mt-auto">
+      <div className="h-36 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={data}
-            margin={{ top: 5, right: 0, left: -20, bottom: 0 }}
-          >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#334155"
-              opacity={0.3}
-              vertical={false}
-            />
+          <LineChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
             <XAxis
               dataKey="timestampUtc"
-              tickFormatter={(t) => {
-                try {
-                  return format(parseISO(t), "HH:mm:ss");
-                } catch {
-                  return t;
-                }
-              }}
-              stroke="#64748b"
+              tickFormatter={(t) => { try { return format(parseISO(t), "HH:mm"); } catch { return t; } }}
+              stroke="#475569"
               fontSize={10}
-              minTickGap={20}
+              minTickGap={24}
+              tickLine={false}
+              axisLine={false}
             />
             <YAxis
-              domain={domain || ["auto", "auto"]}
-              stroke="#64748b"
+              domain={domain ?? ["auto", "auto"]}
+              stroke="#475569"
               fontSize={10}
               tickFormatter={(t) => Number(t).toFixed(0)}
+              tickLine={false}
+              axisLine={false}
             />
             <Tooltip
-              contentStyle={{
-                backgroundColor: "#0f172a",
-                borderColor: "#334155",
-                borderRadius: "8px",
-                fontSize: "11px",
-              }}
-              itemStyle={{ color: color, fontWeight: "bold" }}
-              labelFormatter={(l) => {
-                try {
-                  return format(parseISO(l as string), "HH:mm:ss");
-                } catch {
-                  return l;
-                }
-              }}
+              contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", borderRadius: "8px", fontSize: "11px" }}
+              itemStyle={{ color, fontWeight: "bold" }}
+              labelFormatter={(l) => { try { return format(parseISO(l as string), "HH:mm:ss"); } catch { return l; } }}
             />
             <Line
               type="monotone"
@@ -643,12 +575,7 @@ function LiveChartCard({
               stroke={color}
               strokeWidth={2}
               dot={false}
-              activeDot={{
-                r: 4,
-                fill: color,
-                stroke: "#0f172a",
-                strokeWidth: 2,
-              }}
+              activeDot={{ r: 3, fill: color, stroke: "#0f172a", strokeWidth: 2 }}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -657,70 +584,38 @@ function LiveChartCard({
   );
 }
 
+// ── IntervalInsights ──────────────────────────────────────────────────────────
 function IntervalInsights({ data }: { data: TelemetryPoint[] }) {
-  if (!data || data.length === 0) return null;
+  if (!data.length) return null;
 
-  const avgVoltage =
-    data.reduce((sum, p) => sum + p.avgVoltage, 0) / data.length;
-  const avgCurrent =
-    data.reduce((sum, p) => sum + p.avgCurrent, 0) / data.length;
-  const avgPF =
-    data.reduce((sum, p) => sum + p.totalPowerFactor, 0) / data.length;
-
+  const n = data.length;
+  const avgV = data.reduce((s, p) => s + p.avgVoltage, 0) / n;
+  const avgA = data.reduce((s, p) => s + p.avgCurrent, 0) / n;
+  const avgPF = data.reduce((s, p) => s + p.totalPowerFactor, 0) / n;
   const voltages = data.map((p) => p.avgVoltage);
-  const maxVoltage = voltages.length > 0 ? Math.max(...voltages) : 0;
-  const minVoltage = voltages.length > 0 ? Math.min(...voltages) : 0;
+  const maxV = Math.max(...voltages);
+  const minV = Math.min(...voltages);
+  const stdV = Math.sqrt(data.reduce((s, p) => s + (p.avgVoltage - avgV) ** 2, 0) / n);
+  const totalKwh = data.reduce((s, p) => s + (p.kwh ?? 0), 0);
+
+  const stats = [
+    { label: "Avg Voltage", value: `${avgV.toFixed(1)} V`, color: "#2dd4bf" },
+    { label: "Peak Voltage", value: `${maxV.toFixed(1)} V`, color: "#fb7185" },
+    { label: "Min Voltage", value: `${minV.toFixed(1)} V`, color: "#fbbf24" },
+    { label: "Voltage σ", value: `${stdV.toFixed(2)} V`, color: stdV > 5 ? "#fb7185" : "#94a3b8" },
+    { label: "Avg Current", value: `${avgA.toFixed(2)} A`, color: "#a78bfa" },
+    { label: "Avg PF", value: avgPF.toFixed(3), color: avgPF < 0.85 ? "#fb7185" : "#34d399" },
+    { label: "Energy (period)", value: totalKwh > 0 ? `${totalKwh.toFixed(2)} kWh` : "N/A", color: "#facc15" },
+  ];
 
   return (
-    <div className="grid gap-3 grid-cols-2 md:grid-cols-5 mt-4">
-      <InsightBox
-        label="Period Avg Volts"
-        value={`${avgVoltage.toFixed(1)} V`}
-        icon={<Zap className="h-3 w-3" />}
-      />
-      <InsightBox
-        label="Period Peak Volts"
-        value={`${maxVoltage.toFixed(1)} V`}
-        color="text-rose-400"
-      />
-      <InsightBox
-        label="Period Min Volts"
-        value={`${minVoltage.toFixed(1)} V`}
-        color="text-amber-400"
-      />
-      <InsightBox
-        label="Period Avg Amps"
-        value={`${avgCurrent.toFixed(2)} A`}
-        color="text-cyan-400"
-      />
-      <InsightBox
-        label="Period Avg PF"
-        value={`${avgPF.toFixed(3)}`}
-        color={avgPF < 0.85 ? "text-rose-400" : "text-emerald-400"}
-      />
+    <div className="grid gap-2 grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
+      {stats.map((s) => (
+        <div key={s.label} className="rounded-lg border border-slate-800/60 bg-slate-900/40 px-3 py-2.5">
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-slate-500 mb-1">{s.label}</p>
+          <p className="text-sm font-bold font-mono" style={{ color: s.color }}>{s.value}</p>
+        </div>
+      ))}
     </div>
-  );
-}
-
-function InsightBox({
-  label,
-  value,
-  color,
-  icon,
-}: {
-  label: string;
-  value: string;
-  color?: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <Card className="rounded-lg border border-slate-700/50 bg-slate-800/40 p-3 shadow-sm hover:bg-slate-800/60 transition-colors">
-      <p className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1">
-        {icon} {label}
-      </p>
-      <p className={`text-lg font-bold mt-1 ${color || "text-slate-200"}`}>
-        {value}
-      </p>
-    </Card>
   );
 }

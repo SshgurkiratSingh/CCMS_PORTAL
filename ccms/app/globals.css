@@ -2,12 +2,25 @@
 @import "@heroui/styles";
 
 :root {
-  --background: #00040e;
-  --foreground: #e2e8f0;
-  --surface: #060d1f;
-  --surface-strong: #00040e;
-  --line: #1e293b;
-  --accent: #22d3ee;
+  /* ── Surfaces ── */
+  --background:     #0a0a0f;
+  --surface:        #111118;
+  --surface-raised: #18181f;
+  --surface-inset:  #07070b;
+
+  /* ── Borders ── */
+  --line:           #26263a;
+  --line-strong:    #32324a;
+
+  /* ── Accent: violet ── */
+  --accent:         #a78bfa;
+  --accent-dim:     #7c3aed;
+  --accent-glow:    rgba(167, 139, 250, 0.15);
+  --accent-glow-lg: rgba(167, 139, 250, 0.07);
+
+  /* ── Foreground ── */
+  --foreground:     #e4e4f0;
+  --muted:          #6b6b8a;
 }
 
 @theme inline {
@@ -21,9 +34,24 @@
   border-color: var(--line);
 }
 
-html,
-body {
-  background: var(--background);
+html, body {
+  background-color: var(--background);
   color: var(--foreground);
   font-family: "Segoe UI", "Avenir Next", "Noto Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* ── Background: graphite base + violet bloom top-right + warm ember bottom-left ── */
+body {
+  background-image:
+    radial-gradient(ellipse 70% 45% at 85%  0%,  rgba(124, 58, 237, 0.13) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 35% at  0% 15%,  rgba(167,139,250, 0.06) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 15% 100%, rgba(245,158, 11, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 50% at 50% 120%, rgba( 10, 10, 15, 1.0)  0%, transparent 70%);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--line-strong); }

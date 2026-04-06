@@ -14,6 +14,7 @@ void setupMQTT()
   espClient.setPrivateKey(aws_private_key);
 
   mqttClient.setServer(mqtt_server, mqtt_port);
+  mqttClient.setCallback(mqttCallback);
   mqttClient.setBufferSize(2048);
 }
 
@@ -30,6 +31,8 @@ void handleMQTTConnection()
       if (mqttClient.connect(mqtt_client_id))
       {
         Serial.println("connected");
+        mqttClient.subscribe(SHADOW_DELTA_TOPIC);
+        Serial.println("Subscribed to Shadow Delta Topic");
         lastReconnectAttempt = 0;
       }
       else
@@ -44,11 +47,18 @@ void handleMQTTConnection()
 
 void publishMqttData()
 {
-  StaticJsonDocument<384> doc;
+  JsonDocument doc;
 
   doc["timestamp"] = millis();
   // sending client ID as part of payload for easier debugging in AWS IoT console
   doc["client_id"] = mqtt_client_id;
+
+  // New Sensors
+  doc["batteryVoltage"] = batteryVoltage;
+  doc["mainsVoltageRaw"] = mainsRaw;
+  doc["mainsStatus"] = (mainsRaw > 500) ? "ON" : "OFF"; // Basic threshold logic
+  doc["tiltSwitch"] = tiltSwitchState;
+  doc["temperature"] = currentTemp;
 
   for (int i = 0; i < numMqttRegs; i++)
   {
@@ -75,5 +85,20 @@ void publishMqttData()
       Serial.print("=== MQTT PUBLISH FAILED === rc=");
       Serial.println(mqttClient.state());
     }
+
+    // Publish Device Shadow
+    JsonDocument shadowDoc;
+    JsonObject state = shadowDoc["state"].to<JsonObject>();
+    JsonObject reported = state["reported"].to<JsonObject>();
+    reported["relay_state"] = currentRelayState;
+    reported["device_state"] = currentDeviceState;
+    reported["timeToAutoTurnOn"] = autoOnTime;
+    reported["timeToAutoTurnOff"] = autoOffTime;
+    reported["fault_code"] = currentFaultCode;
+
+    String shadowPayload;
+    serializeJson(shadowDoc, shadowPayload);
+    mqttClient.publish(SHADOW_UPDATE_TOPIC, shadowPayload.c_str());
+    Serial.println("=== SHADOW UPDATE PUBLISHED ===");
   }
 }
