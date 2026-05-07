@@ -79,6 +79,12 @@ void publishMqttData()
     {
       Serial.println("=== MQTT DATA PUBLISHED ===");
       Serial.println(payload);
+
+      // Secondary Bridge Output
+      Serial1.println(payload);
+
+      // Toggle Telemetry Indication LED (Flash on publish)
+      digitalWrite(LED3_PIN, !digitalRead(LED3_PIN));
     }
     else
     {
@@ -100,5 +106,8 @@ void publishMqttData()
     serializeJson(shadowDoc, shadowPayload);
     mqttClient.publish(SHADOW_UPDATE_TOPIC, shadowPayload.c_str());
     Serial.println("=== SHADOW UPDATE PUBLISHED ===");
+
+    // Output shadow data to the UART1 Bridge as well
+    Serial1.println(shadowPayload);
   }
 }
