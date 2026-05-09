@@ -151,7 +151,9 @@ export default function PanelDetailsPage() {
       insights.push({ type: "ok", text: `Power factor stable at ${status.totalPowerFactor.toFixed(2)}` });
 
     if (status.tiltSwitch > 0)
-      insights.push({ type: "warning", text: `Door status: OPEN (Panel compromised or door left open)` });
+      insights.push({ type: "warning", text: `Door status: OPEN (1) - Panel compromised or door left open` });
+    else
+      insights.push({ type: "ok", text: `Door status: CLOSED (0) - Secure` });
 
     if (status.gridFrequency < 49.5 || status.gridFrequency > 50.5)
       insights.push({ type: "warning", text: `Frequency unstable: ${status.gridFrequency.toFixed(2)} Hz` });
@@ -221,11 +223,11 @@ export default function PanelDetailsPage() {
             </div>
           )}
           <Button
-            size="sm"
             variant="secondary"
             onPress={() => void loadData()}
             isDisabled={loading}
-            className="flex items-center gap-1.5"
+            className="flex items-center gap-1.5 text-sm"
+            size="sm"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -266,7 +268,7 @@ export default function PanelDetailsPage() {
             <div>
               <p className="text-slate-500 uppercase tracking-wide">Door status</p>
               <p className={status.tiltSwitch > 0 ? "font-semibold text-amber-400" : "font-semibold text-slate-300"}>
-                {status.tiltSwitch > 0 ? "OPEN" : "CLOSED"}
+                {status.tiltSwitch > 0 ? "OPEN (1)" : "CLOSED (0)"}
               </p>
             </div>
             <div>
@@ -344,25 +346,23 @@ export default function PanelDetailsPage() {
           <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-900/40 p-3 rounded-lg border border-slate-800/80 mt-2 text-sm text-slate-300">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-xs uppercase tracking-wider text-slate-500">From</span>
-              <Input 
+              <input 
                 type="datetime-local" 
-                size="sm"
-                className="w-48"
+                className="w-48 px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 text-sm"
                 value={customRange.start} 
                 onChange={(e) => setCustomRange((prev) => ({ ...prev, start: e.target.value }))} 
               />
             </div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-xs uppercase tracking-wider text-slate-500">To</span>
-              <Input 
+              <input 
                 type="datetime-local" 
-                size="sm"
-                className="w-48"
+                className="w-48 px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 text-sm"
                 value={customRange.end} 
                 onChange={(e) => setCustomRange((prev) => ({ ...prev, end: e.target.value }))} 
               />
             </div>
-            <Button size="sm" variant="shadow" onPress={loadData} className="bg-indigo-500 text-white font-semibold">
+            <Button variant="primary" onPress={loadData} className="bg-indigo-500 text-white font-semibold text-sm" size="sm">
               <RefreshCw className="w-3 h-3 mr-1"/> Apply
             </Button>
           </div>
@@ -372,6 +372,7 @@ export default function PanelDetailsPage() {
           <>
             <IntervalInsights data={telemetry} />
             <DataCorrelator data={telemetry} />
+            <GraphAnomalyDetector data={telemetry} />
             <div className="grid gap-4 lg:grid-cols-2 mt-4">
               {CHART_REGISTERS.map((reg) => (
                 <LiveChartCard
@@ -445,12 +446,12 @@ export default function PanelDetailsPage() {
                 </button>
               </div>
               <Button
-                size="sm"
                 variant="primary"
                 onPress={() => void sendManualCommand()}
                 isDisabled={dispatching}
                 isPending={dispatching}
-                className="flex items-center gap-1.5"
+                className="flex items-center gap-1.5 text-sm"
+                size="sm"
               >
                 Dispatch
               </Button>
@@ -473,28 +474,28 @@ export default function PanelDetailsPage() {
             <div className="flex flex-wrap items-end gap-3 relative z-10">
               <label className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Enable at</span>
-                <Input
+                <input
                   type="time"
-                  variant="secondary"
+                  className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 text-sm"
                   value={scheduleStart}
                   onChange={(e) => setScheduleStart(e.target.value)}
                 />
               </label>
               <label className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Disable at</span>
-                <Input
+                <input
                   type="time"
-                  variant="secondary"
+                  className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 text-sm"
                   value={scheduleEnd}
                   onChange={(e) => setScheduleEnd(e.target.value)}
                 />
               </label>
               <Button
-                size="sm"
                 variant="secondary"
                 onPress={() => void sendScheduleCommand()}
                 isDisabled={dispatching}
                 isPending={dispatching}
+                size="sm"
               >
                 Sync RTC
               </Button>
@@ -666,12 +667,78 @@ function IntervalInsights({ data }: { data: TelemetryPoint[] }) {
 function DataCorrelator({ data }: { data: TelemetryPoint[] }) {
   if (!data || data.length < 2) return null;
 
-  const anomalies: { time: string; msg: string; severity: "high" | "medium" }[] = [];
+  const anomalies: { time: string; msg: string; severity: "high" | "medium" | "low" }[] = [];
+  const patterns: { time: string; msg: string; severity: "high" | "medium" | "low" }[] = [];
 
+  // Calculate statistical baselines
+  const voltages = data.map(p => p.avgVoltage);
+  const avgVoltage = voltages.reduce((a, b) => a + b, 0) / voltages.length;
+  const voltageStd = Math.sqrt(voltages.reduce((a, b) => a + Math.pow(b - avgVoltage, 2), 0) / voltages.length);
+  
+  const currents = data.map(p => p.avgCurrent);
+  const avgCurrent = currents.reduce((a, b) => a + b, 0) / currents.length;
+  
+  const powerFactors = data.map(p => p.totalPowerFactor);
+  const avgPowerFactor = powerFactors.reduce((a, b) => a + b, 0) / powerFactors.length;
+
+  // Track door status changes
+  const doorEvents: { time: string; status: number; voltage: number; current: number }[] = [];
+  
+  for (let i = 0; i < data.length; i++) {
+    const point = data[i];
+    
+    // Door status monitoring (0=closed, 1=open)
+    if (point.tiltSwitch > 0) {
+      doorEvents.push({
+        time: point.timestampUtc,
+        status: point.tiltSwitch,
+        voltage: point.avgVoltage,
+        current: point.avgCurrent
+      });
+      
+      // Check if door opened during low voltage conditions
+      if (point.avgVoltage < 210) {
+        anomalies.push({ 
+          time: point.timestampUtc, 
+          msg: `Door OPENED during low voltage (${point.avgVoltage.toFixed(1)}V) - Possible tampering`, 
+          severity: "high" 
+        });
+      }
+      
+      // Check if door opened during high current (lights on)
+      if (point.avgCurrent > avgCurrent * 1.5) {
+        anomalies.push({ 
+          time: point.timestampUtc, 
+          msg: `Door OPENED while lights active (${point.avgCurrent.toFixed(1)}A) - Unusual activity`, 
+          severity: "medium" 
+        });
+      }
+    }
+    
+    // Statistical anomaly detection (3 sigma rule)
+    if (Math.abs(point.avgVoltage - avgVoltage) > voltageStd * 3) {
+      anomalies.push({ 
+        time: point.timestampUtc, 
+        msg: `Extreme voltage deviation: ${point.avgVoltage.toFixed(1)}V (avg: ${avgVoltage.toFixed(1)}V)`, 
+        severity: "high" 
+      });
+    }
+    
+    // Power factor degradation pattern
+    if (point.totalPowerFactor < 0.7 && avgPowerFactor > 0.85) {
+      anomalies.push({ 
+        time: point.timestampUtc, 
+        msg: `Severe power factor degradation: ${point.totalPowerFactor.toFixed(2)} (normally ${avgPowerFactor.toFixed(2)})`, 
+        severity: "medium" 
+      });
+    }
+  }
+
+  // Pattern detection across time series
   for (let i = 1; i < data.length; i++) {
     const prev = data[i - 1];
     const curr = data[i];
-
+    
     // Detect voltage spikes/drops > 10% between consecutive reported intervals
     const vDiff = Math.abs(curr.avgVoltage - prev.avgVoltage);
     if (prev.avgVoltage > 0 && (vDiff / prev.avgVoltage) > 0.1) {
@@ -692,27 +759,305 @@ function DataCorrelator({ data }: { data: TelemetryPoint[] }) {
     if (prev.avgCurrent > 1 && (iDiff / prev.avgCurrent) > 0.5) {
        anomalies.push({ time: curr.timestampUtc, msg: `Large Current fluctuation: ${prev.avgCurrent.toFixed(1)}A ➔ ${curr.avgCurrent.toFixed(1)}A`, severity: "medium" });
     }
+    
+    // Door status change detection
+    if (prev.tiltSwitch === 0 && curr.tiltSwitch > 0) {
+      patterns.push({ 
+        time: curr.timestampUtc, 
+        msg: `Door opened (0→${curr.tiltSwitch})`, 
+        severity: "medium" 
+      });
+    } else if (prev.tiltSwitch > 0 && curr.tiltSwitch === 0) {
+      patterns.push({ 
+        time: curr.timestampUtc, 
+        msg: `Door closed (${prev.tiltSwitch}→0)`, 
+        severity: "low" 
+      });
+    }
+    
+    // Correlation: Voltage drop followed by door opening
+    if (i > 1) {
+      const prev2 = data[i - 2];
+      if (prev2.avgVoltage > 220 && prev.avgVoltage < 210 && curr.tiltSwitch > 0) {
+        patterns.push({
+          time: curr.timestampUtc,
+          msg: `Pattern: Voltage drop (${prev2.avgVoltage.toFixed(1)}V→${prev.avgVoltage.toFixed(1)}V) followed by door opening`, 
+          severity: "high"
+        });
+      }
+    }
+  }
+  
+  // Time-based pattern analysis
+  if (doorEvents.length > 0) {
+    const doorOpenTimes = doorEvents.map(e => new Date(e.time).getHours());
+    const unusualHours = doorOpenTimes.filter(h => h < 6 || h > 22); // Night hours
+    if (unusualHours.length > 0) {
+      patterns.push({
+        time: data[data.length - 1].timestampUtc,
+        msg: `${unusualHours.length} door openings detected during unusual hours (night/early morning)`, 
+        severity: "high"
+      });
+    }
   }
 
-  // Cap anomalies list to most recent 5 to avoid UI clutter
-  const recentAnomalies = anomalies.reverse().slice(0, 5);
+  // Combine and sort by time (most recent first)
+  const allFindings = [...anomalies, ...patterns]
+    .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  
+  // Cap findings list to most recent 8 to avoid UI clutter
+  const recentFindings = allFindings.slice(0, 8);
 
-  if (recentAnomalies.length === 0) return null;
+  if (recentFindings.length === 0) return null;
+  
+  // Categorize findings
+  const highSeverity = recentFindings.filter(f => f.severity === "high");
+  const mediumSeverity = recentFindings.filter(f => f.severity === "medium");
+  const lowSeverity = recentFindings.filter(f => f.severity === "low");
+  
+  const hasHigh = highSeverity.length > 0;
+  const hasMedium = mediumSeverity.length > 0;
+  const hasLow = lowSeverity.length > 0;
 
   return (
-    <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
+    <div className={`mt-4 rounded-xl border p-4 ${hasHigh ? "border-rose-500/20 bg-rose-500/5" : hasMedium ? "border-amber-500/20 bg-amber-500/5" : "border-blue-500/20 bg-blue-500/5"}`}>
       <div className="flex items-center gap-2 mb-3">
-        <AlertTriangle className="h-4 w-4 text-rose-400" />
-        <h4 className="text-sm font-semibold text-rose-200">Suspicious Historical Patterns Detected</h4>
+        <AlertTriangle className={`h-4 w-4 ${hasHigh ? "text-rose-400" : hasMedium ? "text-amber-400" : "text-blue-400"}`} />
+        <h4 className="text-sm font-semibold text-slate-200">Advanced Pattern Correlation Analysis</h4>
+        <span className="ml-auto text-xs px-2 py-1 rounded-full bg-slate-800/60 text-slate-400">
+          {recentFindings.length} findings
+        </span>
       </div>
+      
+      <div className="mb-3 flex flex-wrap gap-2">
+        {highSeverity.length > 0 && (
+          <span className="text-xs px-2 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+            {highSeverity.length} High
+          </span>
+        )}
+        {mediumSeverity.length > 0 && (
+          <span className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            {mediumSeverity.length} Medium
+          </span>
+        )}
+        {lowSeverity.length > 0 && (
+          <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+            {lowSeverity.length} Low
+          </span>
+        )}
+      </div>
+      
       <ul className="space-y-2 text-xs">
-        {recentAnomalies.map((a, i) => (
-          <li key={i} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-slate-300">
-            <span className="font-mono text-[10px] text-slate-500">{format(parseISO(a.time), "dd MMM HH:mm:ss")}</span>
-            <span className={a.severity === "high" ? "text-rose-400" : "text-amber-400"}>{a.msg}</span>
+        {recentFindings.map((finding, i) => (
+          <li key={i} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3">
+            <span className="font-mono text-[10px] text-slate-500 shrink-0">
+              {format(parseISO(finding.time), "dd MMM HH:mm:ss")}
+            </span>
+            <span className={`flex-1 ${finding.severity === "high" ? "text-rose-400" : finding.severity === "medium" ? "text-amber-400" : "text-blue-400"}`}>
+              {finding.msg}
+            </span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${finding.severity === "high" ? "bg-rose-500/20 text-rose-300" : finding.severity === "medium" ? "bg-amber-500/20 text-amber-300" : "bg-blue-500/20 text-blue-300"}`}>
+              {finding.severity.toUpperCase()}
+            </span>
           </li>
         ))}
       </ul>
+      
+      {doorEvents.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-slate-800/40 text-xs text-slate-500">
+          <span className="flex items-center gap-1">
+            <span className="font-semibold">Door Activity:</span> 
+            {doorEvents.length} opening(s) detected • 
+            Last: {format(parseISO(doorEvents[doorEvents.length - 1]?.time || data[0].timestampUtc), "HH:mm")}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── GraphAnomalyDetector ──────────────────────────────────────────────────────
+function GraphAnomalyDetector({ data }: { data: TelemetryPoint[] }) {
+  if (!data || data.length < 10) return null;
+
+  const anomalies: { metric: string; pattern: string; severity: "high" | "medium" | "low"; confidence: number }[] = [];
+  
+  // Analyze voltage patterns
+  const voltages = data.map(p => p.avgVoltage);
+  const voltageChanges = [];
+  for (let i = 1; i < voltages.length; i++) {
+    voltageChanges.push(Math.abs(voltages[i] - voltages[i-1]));
+  }
+  
+  // Detect sudden voltage drops (more than 15V drop)
+  const significantDrops = voltageChanges.filter(change => change > 15);
+  if (significantDrops.length > 0) {
+    anomalies.push({
+      metric: "Voltage",
+      pattern: `${significantDrops.length} sudden voltage drops (>15V change) detected`, 
+      severity: "high",
+      confidence: Math.min(0.9, significantDrops.length / 10)
+    });
+  }
+  
+  // Detect voltage oscillation patterns
+  let oscillationCount = 0;
+  for (let i = 2; i < voltages.length; i++) {
+    const dir1 = voltages[i-1] - voltages[i-2];
+    const dir2 = voltages[i] - voltages[i-1];
+    if (Math.abs(dir1) > 5 && Math.abs(dir2) > 5 && dir1 * dir2 < 0) {
+      oscillationCount++;
+    }
+  }
+  if (oscillationCount > 3) {
+    anomalies.push({
+      metric: "Voltage",
+      pattern: `Unstable voltage oscillation (${oscillationCount} direction changes)`, 
+      severity: "medium",
+      confidence: Math.min(0.8, oscillationCount / 20)
+    });
+  }
+  
+  // Analyze current patterns
+  const currents = data.map(p => p.avgCurrent);
+  const currentChanges = [];
+  for (let i = 1; i < currents.length; i++) {
+    currentChanges.push(Math.abs(currents[i] - currents[i-1]));
+  }
+  
+  // Detect sudden current spikes (more than 50% increase)
+  let spikeCount = 0;
+  for (let i = 1; i < currents.length; i++) {
+    if (currents[i-1] > 0.5 && currents[i] > currents[i-1] * 1.5) {
+      spikeCount++;
+    }
+  }
+  if (spikeCount > 0) {
+    anomalies.push({
+      metric: "Current",
+      pattern: `${spikeCount} current spikes (>50% increase) detected`, 
+      severity: "medium",
+      confidence: Math.min(0.85, spikeCount / 5)
+    });
+  }
+  
+  // Analyze power factor patterns
+  const powerFactors = data.map(p => p.totalPowerFactor);
+  const lowPFCount = powerFactors.filter(pf => pf < 0.7).length;
+  if (lowPFCount > powerFactors.length * 0.3) { // More than 30% of readings
+    anomalies.push({
+      metric: "Power Factor",
+      pattern: `Extended low power factor period (${lowPFCount}/${powerFactors.length} readings < 0.7)`, 
+      severity: "high",
+      confidence: 0.9
+    });
+  }
+  
+  // Detect correlation between voltage drops and door openings
+  const doorEvents = data.filter(p => p.tiltSwitch > 0);
+  let voltageDropBeforeDoor = 0;
+  for (let i = 1; i < data.length; i++) {
+    if (data[i].tiltSwitch > 0 && data[i-1].tiltSwitch === 0) {
+      // Door just opened, check previous voltage
+      if (data[i-1].avgVoltage < 210) {
+        voltageDropBeforeDoor++;
+      }
+    }
+  }
+  if (voltageDropBeforeDoor > 0 && doorEvents.length > 0) {
+    anomalies.push({
+      metric: "Correlation",
+      pattern: `${voltageDropBeforeDoor}/${doorEvents.length} door openings occurred during low voltage`, 
+      severity: "high",
+      confidence: Math.min(0.95, voltageDropBeforeDoor / doorEvents.length)
+    });
+  }
+  
+  // Detect time-based patterns (nighttime anomalies)
+  const nighttimeReadings = data.filter(p => {
+    const hour = new Date(p.timestampUtc).getHours();
+    return hour < 6 || hour > 22;
+  });
+  
+  const nighttimeVoltageIssues = nighttimeReadings.filter(p => p.avgVoltage < 210 || p.avgVoltage > 250).length;
+  if (nighttimeVoltageIssues > 0) {
+    anomalies.push({
+      metric: "Time Pattern",
+      pattern: `${nighttimeVoltageIssues} voltage anomalies detected during nighttime hours`, 
+      severity: "medium",
+      confidence: Math.min(0.8, nighttimeVoltageIssues / 5)
+    });
+  }
+  
+  if (anomalies.length === 0) return null;
+  
+  // Sort by severity and confidence
+  const sortedAnomalies = anomalies.sort((a, b) => {
+    const severityOrder = { high: 3, medium: 2, low: 1 };
+    if (severityOrder[b.severity] !== severityOrder[a.severity]) {
+      return severityOrder[b.severity] - severityOrder[a.severity];
+    }
+    return b.confidence - a.confidence;
+  });
+  
+  const highCount = sortedAnomalies.filter(a => a.severity === "high").length;
+  const mediumCount = sortedAnomalies.filter(a => a.severity === "medium").length;
+  const lowCount = sortedAnomalies.filter(a => a.severity === "low").length;
+  
+  return (
+    <div className={`mt-4 rounded-xl border p-4 ${highCount > 0 ? "border-purple-500/20 bg-purple-500/5" : mediumCount > 0 ? "border-cyan-500/20 bg-cyan-500/5" : "border-green-500/20 bg-green-500/5"}`}>
+      <div className="flex items-center gap-2 mb-3">
+        <Activity className={`h-4 w-4 ${highCount > 0 ? "text-purple-400" : mediumCount > 0 ? "text-cyan-400" : "text-green-400"}`} />
+        <h4 className="text-sm font-semibold text-slate-200">Graph Pattern Analysis</h4>
+        <span className="ml-auto text-xs px-2 py-1 rounded-full bg-slate-800/60 text-slate-400">
+          {sortedAnomalies.length} patterns
+        </span>
+      </div>
+      
+      <div className="mb-3 flex flex-wrap gap-2">
+        {highCount > 0 && (
+          <span className="text-xs px-2 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            {highCount} High
+          </span>
+        )}
+        {mediumCount > 0 && (
+          <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+            {mediumCount} Medium
+          </span>
+        )}
+        {lowCount > 0 && (
+          <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">
+            {lowCount} Low
+          </span>
+        )}
+      </div>
+      
+      <div className="space-y-3">
+        {sortedAnomalies.slice(0, 5).map((anomaly, i) => (
+          <div key={i} className="p-3 rounded-lg border border-slate-800/40 bg-slate-900/30">
+            <div className="flex items-center justify-between mb-1">
+              <span className={`text-xs font-semibold ${anomaly.severity === "high" ? "text-purple-300" : anomaly.severity === "medium" ? "text-cyan-300" : "text-green-300"}`}>
+                {anomaly.metric}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${anomaly.severity === "high" ? "bg-purple-500/20 text-purple-300" : anomaly.severity === "medium" ? "bg-cyan-500/20 text-cyan-300" : "bg-green-500/20 text-green-300"}`}>
+                  {anomaly.severity.toUpperCase()}
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {(anomaly.confidence * 100).toFixed(0)}% conf
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-slate-300">{anomaly.pattern}</p>
+          </div>
+        ))}
+      </div>
+      
+      {sortedAnomalies.length > 5 && (
+        <div className="mt-3 pt-3 border-t border-slate-800/40 text-xs text-slate-500 text-center">
+          +{sortedAnomalies.length - 5} more patterns detected
+        </div>
+      )}
     </div>
   );
 }
