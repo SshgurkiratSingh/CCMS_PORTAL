@@ -75,6 +75,7 @@ export type PanelCommandResult = {
   requestId: string;
   accepted: boolean;
   updatedDesiredAtUtc: string;
+  message?: string;
 };
 
 export type TelemetryPoint = {
