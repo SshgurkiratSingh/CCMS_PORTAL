@@ -34,8 +34,8 @@ const FleetMap = dynamic(() => import("@/components/fleet-map"), {
 
 const TELEMETRY_REGISTERS = registerMap.registers.filter((r) => r.category !== "Control");
 const CHART_REGISTERS = TELEMETRY_REGISTERS.filter(
-  (r) => (r.priority === "high" || r.priority === "medium") && r.id !== "phase1Voltage"
-).slice(0, 4);
+  (r) => ["avgVoltage", "avgCurrent", "gridFrequency", "temperature", "totalPowerFactor"].includes(r.id)
+);
 
 export default function PanelDetailsPage() {
   const searchParams = useSearchParams();
@@ -46,7 +46,11 @@ export default function PanelDetailsPage() {
   const [panelInfo, setPanelInfo] = useState<PanelRecord | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [timeRange, setTimeRange] = useState<"1H" | "24H" | "7D">("1H");
+  const [timeRange, setTimeRange] = useState<"1H" | "24H" | "7D" | "Custom">("1H");
+  const [customRange, setCustomRange] = useState({
+    start: format(new Date(Date.now() - 24 * 3600 * 1000), "yyyy-MM-dd'T'HH:mm"),
+    end: format(new Date(), "yyyy-MM-dd'T'HH:mm")
+  });
   const [manualState, setManualState] = useState<"ON" | "OFF">("ON");
   const [scheduleStart, setScheduleStart] = useState("18:00");
   const [scheduleEnd, setScheduleEnd] = useState("06:00");
@@ -58,11 +62,19 @@ export default function PanelDetailsPage() {
     if (!panelId) return;
     setLoading(true);
     try {
-      const endUtc = new Date();
-      const startUtc = new Date();
-      if (timeRange === "1H") startUtc.setHours(startUtc.getHours() - 1);
-      else if (timeRange === "24H") startUtc.setHours(startUtc.getHours() - 24);
-      else startUtc.setDate(startUtc.getDate() - 7);
+      let endUtc = new Date();
+      let startUtc = new Date();
+      
+      if (timeRange === "1H") {
+        startUtc.setHours(startUtc.getHours() - 1);
+      } else if (timeRange === "24H") {
+        startUtc.setHours(startUtc.getHours() - 24);
+      } else if (timeRange === "7D") {
+        startUtc.setDate(startUtc.getDate() - 7);
+      } else if (timeRange === "Custom") {
+        startUtc = new Date(customRange.start);
+        endUtc = new Date(customRange.end);
+      }
 
       const [nextStatus, nextTelemetry, panelsResponse] = await Promise.all([
         getPanelStatus(panelId),
@@ -83,14 +95,14 @@ export default function PanelDetailsPage() {
     } finally {
       setLoading(false);
     }
-  }, [panelId, timeRange]);
+  }, [panelId, timeRange, customRange.start, customRange.end]);
 
   useEffect(() => {
     if (!panelId) return;
     void loadData();
     const timer = setInterval(() => void loadData(), 30_000);
     return () => clearInterval(timer);
-  }, [loadData, panelId, timeRange]);
+  }, [loadData, panelId, timeRange, customRange.start, customRange.end]);
 
   const sendManualCommand = async () => {
     if (!panelId) return;
@@ -137,6 +149,9 @@ export default function PanelDetailsPage() {
       insights.push({ type: "warning", text: `Poor power factor: ${status.totalPowerFactor.toFixed(2)} (< 0.85)` });
     else
       insights.push({ type: "ok", text: `Power factor stable at ${status.totalPowerFactor.toFixed(2)}` });
+
+    if (status.tiltSwitch > 0)
+      insights.push({ type: "warning", text: `Door status: OPEN (Panel compromised or door left open)` });
 
     if (status.gridFrequency < 49.5 || status.gridFrequency > 50.5)
       insights.push({ type: "warning", text: `Frequency unstable: ${status.gridFrequency.toFixed(2)} Hz` });
@@ -249,9 +264,9 @@ export default function PanelDetailsPage() {
               </p>
             </div>
             <div>
-              <p className="text-slate-500 uppercase tracking-wide">Tilt Switch</p>
+              <p className="text-slate-500 uppercase tracking-wide">Door status</p>
               <p className={status.tiltSwitch > 0 ? "font-semibold text-amber-400" : "font-semibold text-slate-300"}>
-                {status.tiltSwitch > 0 ? "TRIGGERED" : "NORMAL"}
+                {status.tiltSwitch > 0 ? "OPEN" : "CLOSED"}
               </p>
             </div>
             <div>
@@ -311,13 +326,13 @@ export default function PanelDetailsPage() {
             <History className="h-4 w-4 text-indigo-400" /> Historical Feed
           </h3>
           <div className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-lg border border-slate-800/80">
-            {(["1H", "24H", "7D"] as const).map((range) => (
+            {(["1H", "24H", "7D", "Custom"] as const).map((range) => (
               <Button
                 key={range}
                 size="sm"
                 variant={timeRange === range ? "primary" : "ghost"}
                 onPress={() => setTimeRange(range)}
-                className={`px-3 text-xs font-semibold min-w-10 ${timeRange === range ? "text-slate-950" : "text-slate-300 hover:text-slate-100"}`}
+                className={`px-3 text-xs font-semibold min-w-10 ${timeRange === range ? "text-slate-950 bg-indigo-400" : "text-slate-300 hover:text-slate-100"}`}
               >
                 {range}
               </Button>
@@ -325,10 +340,39 @@ export default function PanelDetailsPage() {
           </div>
         </div>
 
+        {timeRange === "Custom" && (
+          <div className="flex flex-col sm:flex-row items-center gap-4 bg-slate-900/40 p-3 rounded-lg border border-slate-800/80 mt-2 text-sm text-slate-300">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-xs uppercase tracking-wider text-slate-500">From</span>
+              <Input 
+                type="datetime-local" 
+                size="sm"
+                className="w-48"
+                value={customRange.start} 
+                onChange={(e) => setCustomRange((prev) => ({ ...prev, start: e.target.value }))} 
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-xs uppercase tracking-wider text-slate-500">To</span>
+              <Input 
+                type="datetime-local" 
+                size="sm"
+                className="w-48"
+                value={customRange.end} 
+                onChange={(e) => setCustomRange((prev) => ({ ...prev, end: e.target.value }))} 
+              />
+            </div>
+            <Button size="sm" variant="shadow" onPress={loadData} className="bg-indigo-500 text-white font-semibold">
+              <RefreshCw className="w-3 h-3 mr-1"/> Apply
+            </Button>
+          </div>
+        )}
+
         {telemetry.length > 0 ? (
           <>
             <IntervalInsights data={telemetry} />
-            <div className="grid gap-4 lg:grid-cols-2">
+            <DataCorrelator data={telemetry} />
+            <div className="grid gap-4 lg:grid-cols-2 mt-4">
               {CHART_REGISTERS.map((reg) => (
                 <LiveChartCard
                   key={reg.id}
@@ -616,6 +660,59 @@ function IntervalInsights({ data }: { data: TelemetryPoint[] }) {
           <p className="text-sm font-bold font-mono" style={{ color: s.color }}>{s.value}</p>
         </div>
       ))}
+    </div>
+  );
+}
+function DataCorrelator({ data }: { data: TelemetryPoint[] }) {
+  if (!data || data.length < 2) return null;
+
+  const anomalies: { time: string; msg: string; severity: "high" | "medium" }[] = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const prev = data[i - 1];
+    const curr = data[i];
+
+    // Detect voltage spikes/drops > 10% between consecutive reported intervals
+    const vDiff = Math.abs(curr.avgVoltage - prev.avgVoltage);
+    if (prev.avgVoltage > 0 && (vDiff / prev.avgVoltage) > 0.1) {
+      if (curr.avgVoltage > prev.avgVoltage) {
+         anomalies.push({ time: curr.timestampUtc, msg: `Sudden Voltage Spike: ${prev.avgVoltage.toFixed(1)}V ➔ ${curr.avgVoltage.toFixed(1)}V`, severity: "high" });
+      } else {
+         anomalies.push({ time: curr.timestampUtc, msg: `Sudden Voltage Drop: ${prev.avgVoltage.toFixed(1)}V ➔ ${curr.avgVoltage.toFixed(1)}V`, severity: "high" });
+      }
+    }
+
+    // Detect sudden PF drops
+    if (prev.totalPowerFactor > 0.8 && curr.totalPowerFactor < 0.7) {
+      anomalies.push({ time: curr.timestampUtc, msg: `Abnormal Power Factor collapse: ${prev.totalPowerFactor.toFixed(2)} ➔ ${curr.totalPowerFactor.toFixed(2)}`, severity: "medium" });
+    }
+
+    // Current anomaly (lights acting up)
+    const iDiff = Math.abs(curr.avgCurrent - prev.avgCurrent);
+    if (prev.avgCurrent > 1 && (iDiff / prev.avgCurrent) > 0.5) {
+       anomalies.push({ time: curr.timestampUtc, msg: `Large Current fluctuation: ${prev.avgCurrent.toFixed(1)}A ➔ ${curr.avgCurrent.toFixed(1)}A`, severity: "medium" });
+    }
+  }
+
+  // Cap anomalies list to most recent 5 to avoid UI clutter
+  const recentAnomalies = anomalies.reverse().slice(0, 5);
+
+  if (recentAnomalies.length === 0) return null;
+
+  return (
+    <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <AlertTriangle className="h-4 w-4 text-rose-400" />
+        <h4 className="text-sm font-semibold text-rose-200">Suspicious Historical Patterns Detected</h4>
+      </div>
+      <ul className="space-y-2 text-xs">
+        {recentAnomalies.map((a, i) => (
+          <li key={i} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-slate-300">
+            <span className="font-mono text-[10px] text-slate-500">{format(parseISO(a.time), "dd MMM HH:mm:ss")}</span>
+            <span className={a.severity === "high" ? "text-rose-400" : "text-amber-400"}>{a.msg}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

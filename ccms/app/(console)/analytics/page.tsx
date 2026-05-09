@@ -78,7 +78,8 @@ export default function AnalyticsPage() {
   }, []);
 
   const [activeTab, setActiveTab] = useState<TabType>("chart");
-  const [customChartType, setCustomChartType] = useState<CustomChartType>("line");
+  const [customChartType, setCustomChartType] =
+    useState<CustomChartType>("line");
   const [customPanelId, setCustomPanelId] = useState<string>("");
   const [customMetrics, setCustomMetrics] = useState<Record<string, boolean>>(
     () => {
@@ -640,13 +641,17 @@ export default function AnalyticsPage() {
                 </label>
 
                 <div className="lg:col-span-2">
-                  <span className="block text-sm text-slate-400 mb-1.5">Chart Type</span>
+                  <span className="block text-sm text-slate-400 mb-1.5">
+                    Chart Type
+                  </span>
                   <div className="flex flex-wrap gap-2">
                     {(["line", "area", "bar"] as const).map((type) => (
                       <Button
                         key={type}
                         size="sm"
-                        variant={customChartType === type ? "primary" : "secondary"}
+                        variant={
+                          customChartType === type ? "primary" : "secondary"
+                        }
                         onPress={() => setCustomChartType(type)}
                         className="capitalize"
                       >
@@ -670,7 +675,10 @@ export default function AnalyticsPage() {
                         label={reg.name}
                         checked={!!customMetrics[reg.id]}
                         onChange={(checked) =>
-                          setCustomMetrics((prev) => ({ ...prev, [reg.id]: checked }))
+                          setCustomMetrics((prev) => ({
+                            ...prev,
+                            [reg.id]: checked,
+                          }))
                         }
                         color={`bg-[${reg.chartColor}]`}
                       />
@@ -678,7 +686,8 @@ export default function AnalyticsPage() {
                 </div>
               </div>
 
-              {customPanelTelemetry.length === 0 || selectedCustomMetricDefs.length === 0 ? (
+              {customPanelTelemetry.length === 0 ||
+              selectedCustomMetricDefs.length === 0 ? (
                 <div className="rounded-lg border border-slate-800 bg-slate-950/30 p-8 text-center text-slate-400 text-sm">
                   {customPanelTelemetry.length === 0
                     ? "No telemetry points for selected panel. Run query or pick another panel."
@@ -688,8 +697,15 @@ export default function AnalyticsPage() {
                 <div className="h-105 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     {customChartType === "line" ? (
-                      <LineChart data={customPanelTelemetry} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                      <LineChart
+                        data={customPanelTelemetry}
+                        margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#334155"
+                          opacity={0.4}
+                        />
                         <XAxis
                           dataKey="timestampUtc"
                           tickFormatter={formatTimeXAxis}
@@ -699,7 +715,11 @@ export default function AnalyticsPage() {
                         />
                         <YAxis stroke="#94a3b8" fontSize={12} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px" }}
+                          contentStyle={{
+                            backgroundColor: "#0f172a",
+                            borderColor: "#334155",
+                            borderRadius: "8px",
+                          }}
                           itemStyle={{ color: "#e2e8f0" }}
                         />
                         <Legend />
@@ -717,8 +737,15 @@ export default function AnalyticsPage() {
                         ))}
                       </LineChart>
                     ) : customChartType === "area" ? (
-                      <AreaChart data={customPanelTelemetry} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                      <AreaChart
+                        data={customPanelTelemetry}
+                        margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#334155"
+                          opacity={0.4}
+                        />
                         <XAxis
                           dataKey="timestampUtc"
                           tickFormatter={formatTimeXAxis}
@@ -728,7 +755,11 @@ export default function AnalyticsPage() {
                         />
                         <YAxis stroke="#94a3b8" fontSize={12} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px" }}
+                          contentStyle={{
+                            backgroundColor: "#0f172a",
+                            borderColor: "#334155",
+                            borderRadius: "8px",
+                          }}
                           itemStyle={{ color: "#e2e8f0" }}
                         />
                         <Legend />
@@ -746,8 +777,15 @@ export default function AnalyticsPage() {
                         ))}
                       </AreaChart>
                     ) : (
-                      <BarChart data={customPanelTelemetry} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                      <BarChart
+                        data={customPanelTelemetry}
+                        margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#334155"
+                          opacity={0.4}
+                        />
                         <XAxis
                           dataKey="timestampUtc"
                           tickFormatter={formatTimeXAxis}
@@ -757,7 +795,11 @@ export default function AnalyticsPage() {
                         />
                         <YAxis stroke="#94a3b8" fontSize={12} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "8px" }}
+                          contentStyle={{
+                            backgroundColor: "#0f172a",
+                            borderColor: "#334155",
+                            borderRadius: "8px",
+                          }}
                           itemStyle={{ color: "#e2e8f0" }}
                         />
                         <Legend />

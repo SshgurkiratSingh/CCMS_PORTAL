@@ -66,7 +66,4 @@ extern float mqttValues[];
 extern unsigned long lastMqttPublish;
 extern const unsigned long mqttPublishInterval;
 
-// Display helper
-void displayStatusMessage(String msg);
-
 #endif

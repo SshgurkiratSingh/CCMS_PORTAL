@@ -7,9 +7,15 @@ import { Button, Card, Chip, Input } from "@heroui/react";
 
 // ── Page header ──────────────────────────────────────────────────────────────
 export function PageHeader({
-  icon, title, description, action,
+  icon,
+  title,
+  description,
+  action,
 }: {
-  icon: ReactNode; title: string; description?: string; action?: ReactNode;
+  icon: ReactNode;
+  title: string;
+  description?: string;
+  action?: ReactNode;
 }) {
   return (
     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#26263a] pb-4">
@@ -27,39 +33,51 @@ export function PageHeader({
 
 // ── Section card ─────────────────────────────────────────────────────────────
 export function SectionCard({
-  children, className = "",
+  children,
+  className = "",
 }: {
-  children: ReactNode; className?: string;
+  children: ReactNode;
+  className?: string;
 }) {
   return (
-    <Card className={`rounded-xl border border-[#26263a] border-t-white/5 bg-[#111118]/80 ${className}`}>
+    <Card
+      className={`rounded-xl border border-[#26263a] border-t-white/5 bg-[#111118]/80 ${className}`}
+    >
       {children}
     </Card>
   );
 }
 
 // ── Card header row ───────────────────────────────────────────────────────────
-export function CardHeader({ icon, title }: { icon: ReactNode; title: string }) {
+export function CardHeader({
+  icon,
+  title,
+}: {
+  icon: ReactNode;
+  title: string;
+}) {
   return (
     <div className="flex items-center gap-2 border-b border-[#26263a] pb-3 mb-4">
       {icon}
-      <h3 className="text-sm font-semibold text-[#c8c8e0] tracking-wide">{title}</h3>
+      <h3 className="text-sm font-semibold text-[#c8c8e0] tracking-wide">
+        {title}
+      </h3>
     </div>
   );
 }
 
 // ── Status chip (panel state) ─────────────────────────────────────────────────
 const PANEL_STATUS_STYLES: Record<PanelState, string> = {
-  ONLINE:  "bg-emerald-500/10 text-emerald-400 border-emerald-500/25",
+  ONLINE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/25",
   OFFLINE: "bg-[#26263a]/60    text-[#8080a0]   border-[#32324a]",
-  FAULT:   "bg-rose-500/10    text-rose-400    border-rose-500/25 animate-pulse",
+  FAULT: "bg-rose-500/10    text-rose-400    border-rose-500/25 animate-pulse",
   UNKNOWN: "bg-amber-500/10   text-amber-400   border-amber-500/25",
 };
 
 const PANEL_DOT: Record<PanelState, string> = {
-  ONLINE:  "bg-emerald-400",
+  ONLINE: "bg-emerald-400",
   OFFLINE: "bg-[#606080]",
-  FAULT:   "bg-rose-400",
+  FAULT: "bg-rose-400",
   UNKNOWN: "bg-amber-400",
 };
 
@@ -70,7 +88,9 @@ export function PanelStatusChip({ status }: { status: PanelState }) {
       size="sm"
       className={`inline-flex items-center gap-1 border text-[10px] font-bold uppercase tracking-wider ${PANEL_STATUS_STYLES[status] ?? PANEL_STATUS_STYLES.UNKNOWN}`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${PANEL_DOT[status] ?? PANEL_DOT.UNKNOWN}`} />
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${PANEL_DOT[status] ?? PANEL_DOT.UNKNOWN}`}
+      />
       {status}
     </Chip>
   );
@@ -79,9 +99,9 @@ export function PanelStatusChip({ status }: { status: PanelState }) {
 // ── Severity chip ─────────────────────────────────────────────────────────────
 const SEVERITY_STYLES: Record<AlertSeverity, string> = {
   CRITICAL: "bg-rose-500/10   text-rose-400   border-rose-500/25",
-  HIGH:     "bg-orange-500/10 text-orange-400 border-orange-500/25",
-  MEDIUM:   "bg-amber-500/10  text-amber-400  border-amber-500/25",
-  LOW:      "bg-violet-500/10 text-violet-400 border-violet-500/25",
+  HIGH: "bg-orange-500/10 text-orange-400 border-orange-500/25",
+  MEDIUM: "bg-amber-500/10  text-amber-400  border-amber-500/25",
+  LOW: "bg-violet-500/10 text-violet-400 border-violet-500/25",
 };
 
 export function SeverityChip({ severity }: { severity: AlertSeverity }) {
@@ -134,7 +154,13 @@ export function WarningBanner({ message }: { message: string }) {
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
-export function EmptyState({ icon, message }: { icon: ReactNode; message: string }) {
+export function EmptyState({
+  icon,
+  message,
+}: {
+  icon: ReactNode;
+  message: string;
+}) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-[#26263a] border-dashed bg-[#111118]/40 p-14 text-center text-[#606080]">
       <div className="mb-3 opacity-25">{icon}</div>
@@ -164,9 +190,15 @@ export function Toolbar({ children }: { children: ReactNode }) {
 
 // ── Native select ─────────────────────────────────────────────────────────────
 export function NativeSelect({
-  value, onChange, children, className = "",
+  value,
+  onChange,
+  children,
+  className = "",
 }: {
-  value: string; onChange: (v: string) => void; children: ReactNode; className?: string;
+  value: string;
+  onChange: (v: string) => void;
+  children: ReactNode;
+  className?: string;
 }) {
   return (
     <select
@@ -181,9 +213,15 @@ export function NativeSelect({
 
 // ── Toolbar search input ──────────────────────────────────────────────────────
 export function ToolbarSearchInput({
-  value, onChange, placeholder, className = "",
+  value,
+  onChange,
+  placeholder,
+  className = "",
 }: {
-  value: string; onChange: (value: string) => void; placeholder: string; className?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  className?: string;
 }) {
   return (
     <Input
@@ -199,7 +237,9 @@ export function ToolbarSearchInput({
 
 // ── Segmented toggle ──────────────────────────────────────────────────────────
 export function SegmentedToggle({
-  options, value, onChange,
+  options,
+  value,
+  onChange,
 }: {
   options: Array<{ key: string; label: string; icon?: ReactNode }>;
   value: string;

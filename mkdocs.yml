@@ -4,6 +4,7 @@ theme:
   name: material
 nav:
   - Home: index.md
+  - Frontend and Lambda Report: frontend-lambda-project-report.md
   - Web Portal: web-portal.md
   - Hardware (ESP32): hardware.md
   - Lambda Backend: lambda.md

@@ -28,22 +28,18 @@ void handleMQTTConnection()
     {
       lastReconnectAttempt = now;
       Serial.print("Attempting MQTT connection...");
-      displayStatusMessage("MQTT Connecting...");
       if (mqttClient.connect(mqtt_client_id))
       {
         Serial.println("connected");
-        displayStatusMessage("MQTT Connected.");
         mqttClient.subscribe(SHADOW_DELTA_TOPIC);
         Serial.println("Subscribed to Shadow Delta Topic");
         lastReconnectAttempt = 0;
-        delay(1000);
       }
       else
       {
         Serial.print("failed, rc=");
         Serial.print(mqttClient.state());
         Serial.println(" try again in 5 seconds");
-        displayStatusMessage("MQTT Failed.");
       }
     }
   }

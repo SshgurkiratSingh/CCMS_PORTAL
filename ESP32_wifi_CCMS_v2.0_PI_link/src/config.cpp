@@ -1,7 +1,7 @@
 #include "config.h"
 
-const char *ssid = "Nuclear Detonator";
-const char *password = "nukezone";
+const char *ssid = "Airtel_Node";
+const char *password = "air66343";
 
 const char *mqtt_server = "a3ia5opqzsvf3l-ats.iot.us-east-1.amazonaws.com";
 const int mqtt_port = 8883;
@@ -24,4 +24,4 @@ const int numMqttRegs = sizeof(mqttRegisters) / sizeof(mqttRegisters[0]);
 float mqttValues[17]; // Size matching numMqttRegs
 
 unsigned long lastMqttPublish = 0;
-const unsigned long mqttPublishInterval = 10000;
+const unsigned long mqttPublishInterval = 25000;

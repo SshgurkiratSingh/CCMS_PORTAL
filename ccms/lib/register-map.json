@@ -18,7 +18,7 @@
     {
       "id": "mainsVoltageRaw",
       "address": "topic:mainsVoltageRaw",
-      "name": "Raw Mains Voltage",
+      "name": "Analog sensor Addon",
       "description": "Raw mains line reading from controller payload",
       "unit": "V",
       "dataType": "float32",
@@ -44,7 +44,7 @@
     {
       "id": "tiltSwitch",
       "address": "topic:tiltSwitch",
-      "name": "Tilt Switch",
+      "name": "Door status",
       "description": "Tilt event flag (0 normal, 1 tilted)",
       "unit": "state",
       "dataType": "uint16",
@@ -53,19 +53,6 @@
       "access": "R",
       "category": "Auxiliary",
       "chartColor": "#38bdf8"
-    },
-    {
-      "id": "r3003",
-      "address": "3003",
-      "name": "Register R3003",
-      "description": "Raw meter register 3003 exposed from MQTT payload",
-      "unit": "",
-      "dataType": "float32",
-      "multiplier": 1,
-      "priority": "low",
-      "access": "R",
-      "category": "Auxiliary",
-      "chartColor": "#eab308"
     },
     {
       "id": "phase1Voltage",

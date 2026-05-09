@@ -29,24 +29,10 @@ const int NUM_SCREENS = 3;
 bool lastButtonState = HIGH;
 unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 50;
-unsigned long lastScreenSwitchTime = 0;
-const unsigned long screenSwitchInterval = 5000; // 5 seconds auto-switch
-
-void displayStatusMessage(String msg)
-{
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println(F("--- BOOT SEQUENCE ---"));
-  display.println(msg);
-  display.display();
-}
 
 void syncNTP()
 {
   Serial.print("Syncing time with NTP...");
-  displayStatusMessage("Syncing NTP...");
   configTime(19800, 0, "pool.ntp.org", "time.nist.gov"); // IST (5.5 hrs * 3600)
   time_t now = time(nullptr);
   int retry = 0;
@@ -61,14 +47,11 @@ void syncNTP()
   {
     rtc.adjust(DateTime(now));
     Serial.println(" RTC updated from NTP.");
-    displayStatusMessage("NTP Sync Success");
   }
   else
   {
     Serial.println(" NTP Sync Failed.");
-    displayStatusMessage("NTP Sync Failed");
   }
-  delay(1000);
 }
 
 void mqttCallback(char *topic, byte *payload, unsigned int length)
@@ -221,30 +204,52 @@ void setup()
   else
   {
     display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.println(F("CCMS Node Booting..."));
     display.display();
+    delay(500);
+    display.println(F("Init Modules: OK"));
+    display.display();
+    delay(500);
   }
 
   setupMeter();
+  if (display.getBuffer()) {
+    display.println(F("UART Stream: SET"));
+    display.display();
+    delay(500);
+  }
 
   for (int i = 0; i < numMqttRegs; ++i)
     mqttValues[i] = 0.0f;
 
+  if (display.getBuffer()) {
+    display.println(F("Conn WiFi..."));
+    display.display();
+  }
   setupWiFi();
+  
+  if (display.getBuffer()) {
+    display.println(F("Syncing NTP..."));
+    display.display();
+  }
   syncNTP();
+  
+  if (display.getBuffer()) {
+    display.println(F("Conn MQTT..."));
+    display.display();
+  }
   setupMQTT();
 
-  Serial.println("\n--- Multifunction Meter MQTT Publisher Started ---");
-}
+  if (display.getBuffer()) {
+    display.println(F("Boot Complete!"));
+    display.display();
+    delay(1000);
+  }
 
-float calculateBatteryVoltage()
-{
-  // The ESP32 ADC is 12-bit (0-4095) with a reference voltage of ~3.3V
-  int adcValue = analogRead(BAT_ADC_PIN);
-  float pinVoltage = adcValue * (3.3 / 4095.0);
-  
-  // Replace the factor of 4.0 with your actual voltage divider ratio: (R1 + R2) / R2
-  float dividerRatio = 4.0; 
-  return pinVoltage * dividerRatio;
+  Serial.println("\n--- Multifunction Meter MQTT Publisher Started ---");
 }
 
 void loop()
@@ -259,20 +264,14 @@ void loop()
   mqttClient.loop();
 
   // Multi-Vector Hardware Polling
-  batteryVoltage = calculateBatteryVoltage();
+  // Simple voltage divider assuming standard resistors, calibrate later
+  batteryVoltage = analogRead(BAT_ADC_PIN) * (3.3 / 4095.0) * 4.0; // Assume factor of 4
   mainsRaw = analogRead(MAINS_ADC_PIN);
   tiltSwitchState = digitalRead(TILT_SW_PIN);
   float newTemp = dht.readTemperature();
   if (!isnan(newTemp))
   {
     currentTemp = newTemp;
-  }
-
-  // Handle Auto Screen Switch
-  if (millis() - lastScreenSwitchTime > screenSwitchInterval)
-  {
-    currentScreen = (currentScreen + 1) % NUM_SCREENS;
-    lastScreenSwitchTime = millis();
   }
 
   // Handle Push Button & UI
@@ -285,8 +284,8 @@ void loop()
   {
     if (reading == LOW && lastButtonState == HIGH)
     {
+      Serial.println("Button Pressed (ON)");
       currentScreen = (currentScreen + 1) % NUM_SCREENS;
-      lastScreenSwitchTime = millis(); // Reset timer on manual override
     }
   }
   lastButtonState = reading;
