@@ -10,7 +10,7 @@ import {
   getPanelTelemetry,
   getPanels,
 } from "@/lib/api/ccms-api";
-import type { PanelLiveStatus, TelemetryPoint, PanelRecord } from "@/lib/api/types";
+import type { PanelLiveStatus, TelemetryPoint, PanelRecord, PanelCommandPayload } from "@/lib/api/types";
 import registerMap from "@/lib/register-map.json";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -57,6 +57,12 @@ export default function PanelDetailsPage() {
   const [dispatching, setDispatching] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Shadow keys state
+  const [relayState, setRelayState] = useState<"ON" | "OFF">("ON");
+  const [deviceState, setDeviceState] = useState<"ON" | "OFF">("ON");
+  const [timeToAutoTurnOn, setTimeToAutoTurnOn] = useState("18:00");
+  const [timeToAutoTurnOff, setTimeToAutoTurnOff] = useState("06:00");
 
   const loadData = useCallback(async () => {
     if (!panelId) return;
@@ -130,6 +136,29 @@ export default function PanelDetailsPage() {
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Schedule command failed.");
+    } finally {
+      setDispatching(false);
+    }
+  };
+
+  const sendShadowKeysCommand = async () => {
+    if (!panelId) return;
+    setDispatching(true);
+    try {
+      const shadowKeys: PanelCommandPayload = {
+        action: "UPDATE_SHADOW_KEYS",
+        shadowKeys: {
+          relay_state: relayState,
+          device_state: deviceState,
+          timeToAutoTurnOn,
+          timeToAutoTurnOff,
+        },
+      };
+      const result = await postPanelCommand(panelId, shadowKeys);
+      setMessage(`Shadow keys updated — request ${result.requestId}`);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Shadow keys update failed.");
     } finally {
       setDispatching(false);
     }
@@ -498,6 +527,100 @@ export default function PanelDetailsPage() {
                 size="sm"
               >
                 Sync RTC
+              </Button>
+            </div>
+          </Card>
+
+          {/* Shadow Keys Control */}
+          <Card className="rounded-xl border border-slate-700/80 bg-slate-900/50 p-5 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-[0.06] group-hover:opacity-[0.12] transition-opacity pointer-events-none">
+              <Zap className="h-24 w-24 text-amber-300" />
+            </div>
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="h-4 w-4 text-amber-400" />
+              <h3 className="font-semibold text-slate-100">Shadow Keys</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-5">
+              Directly update device shadow state values.
+            </p>
+
+            <div className="flex flex-wrap items-end gap-3 relative z-10">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Relay State</span>
+                <div className="flex rounded-lg border border-slate-700 bg-slate-950 p-1 gap-1">
+                  <button
+                    onClick={() => setRelayState("ON")}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                      relayState === "ON"
+                        ? "bg-emerald-500 text-slate-950 shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    ON
+                  </button>
+                  <button
+                    onClick={() => setRelayState("OFF")}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                      relayState === "OFF"
+                        ? "bg-rose-500 text-white shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    OFF
+                  </button>
+                </div>
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Device State</span>
+                <div className="flex rounded-lg border border-slate-700 bg-slate-950 p-1 gap-1">
+                  <button
+                    onClick={() => setDeviceState("ON")}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                      deviceState === "ON"
+                        ? "bg-emerald-500 text-slate-950 shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    ON
+                  </button>
+                  <button
+                    onClick={() => setDeviceState("OFF")}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                      deviceState === "OFF"
+                        ? "bg-rose-500 text-white shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    OFF
+                  </button>
+                </div>
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Auto Turn On</span>
+                <input
+                  type="time"
+                  className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 text-sm"
+                  value={timeToAutoTurnOn}
+                  onChange={(e) => setTimeToAutoTurnOn(e.target.value)}
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Auto Turn Off</span>
+                <input
+                  type="time"
+                  className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 text-sm"
+                  value={timeToAutoTurnOff}
+                  onChange={(e) => setTimeToAutoTurnOff(e.target.value)}
+                />
+              </label>
+              <Button
+                variant="secondary"
+                onPress={() => void sendShadowKeysCommand()}
+                isDisabled={dispatching}
+                isPending={dispatching}
+                size="sm"
+              >
+                Update
               </Button>
             </div>
           </Card>

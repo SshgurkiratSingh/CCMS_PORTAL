@@ -73,9 +73,17 @@ void syncNTP()
 
 void mqttCallback(char *topic, byte *payload, unsigned int length)
 {
-  if (strcmp(topic, SHADOW_DELTA_TOPIC) == 0)
+  // Handle both delta and update topics
+  bool isDelta = strcmp(topic, SHADOW_DELTA_TOPIC) == 0;
+  bool isUpdate = strcmp(topic, SHADOW_UPDATE_TOPIC) == 0;
+  
+  if (isDelta || isUpdate)
   {
-    Serial.println("TACTICAL ALERT: Multi-Vector Shadow Delta Received.");
+    if (isDelta) {
+      Serial.println("TACTICAL ALERT: Multi-Vector Shadow Delta Received.");
+    } else {
+      Serial.println("TACTICAL ALERT: Shadow Update Received.");
+    }
 
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload, length);
@@ -86,37 +94,67 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
     }
 
     JsonObject state = doc["state"].as<JsonObject>();
+    
+    // Get desired state (for update topic) or direct state (for delta topic)
+    JsonObject desiredState = state["desired"].is<JsonObject>() ? state["desired"].as<JsonObject>() : state;
+    
     bool stateChanged = false;
 
-    // PARSE RELAY COMMAND
-    if (state["relay_state"].is<bool>())
+    // PARSE RELAY COMMAND - Handle both camelCase and snake_case
+    if (desiredState["relayState"].is<bool>())
     {
-      currentRelayState = state["relay_state"];
+      currentRelayState = desiredState["relayState"];
+      digitalWrite(RELAY_PIN, currentRelayState ? HIGH : LOW);
+      Serial.print("Relay GPIO switched to: ");
+      Serial.println(currentRelayState ? "ON" : "OFF");
+      stateChanged = true;
+    }
+    else if (desiredState["relay_state"].is<bool>())
+    {
+      currentRelayState = desiredState["relay_state"];
       digitalWrite(RELAY_PIN, currentRelayState ? HIGH : LOW);
       Serial.print("Relay GPIO switched to: ");
       Serial.println(currentRelayState ? "ON" : "OFF");
       stateChanged = true;
     }
 
-    // PARSE TIMING/SCHEDULE COMMANDS
-    if (state["timeToAutoTurnOn"].is<String>())
+    // PARSE TIMING/SCHEDULE COMMANDS - Handle both camelCase and snake_case
+    if (desiredState["timeToAutoTurnOn"].is<String>())
     {
-      autoOnTime = state["timeToAutoTurnOn"].as<String>();
+      autoOnTime = desiredState["timeToAutoTurnOn"].as<String>();
+      Serial.println("New Auto-ON Schedule Locked: " + autoOnTime);
+      stateChanged = true;
+    }
+    else if (desiredState["time_to_auto_turn_on"].is<String>())
+    {
+      autoOnTime = desiredState["time_to_auto_turn_on"].as<String>();
       Serial.println("New Auto-ON Schedule Locked: " + autoOnTime);
       stateChanged = true;
     }
 
-    if (state["timeToAutoTurnOff"].is<String>())
+    if (desiredState["timeToAutoTurnOff"].is<String>())
     {
-      autoOffTime = state["timeToAutoTurnOff"].as<String>();
+      autoOffTime = desiredState["timeToAutoTurnOff"].as<String>();
+      Serial.println("New Auto-OFF Schedule Locked: " + autoOffTime);
+      stateChanged = true;
+    }
+    else if (desiredState["time_to_auto_turn_off"].is<String>())
+    {
+      autoOffTime = desiredState["time_to_auto_turn_off"].as<String>();
       Serial.println("New Auto-OFF Schedule Locked: " + autoOffTime);
       stateChanged = true;
     }
 
-    // PARSE DEVICE STATE
-    if (state["device_state"].is<String>())
+    // PARSE DEVICE STATE - Handle both camelCase and snake_case
+    if (desiredState["deviceState"].is<String>())
     {
-      currentDeviceState = state["device_state"].as<String>();
+      currentDeviceState = desiredState["deviceState"].as<String>();
+      Serial.println("Device Status Override: " + currentDeviceState);
+      stateChanged = true;
+    }
+    else if (desiredState["device_state"].is<String>())
+    {
+      currentDeviceState = desiredState["device_state"].as<String>();
       Serial.println("Device Status Override: " + currentDeviceState);
       stateChanged = true;
     }

@@ -60,6 +60,15 @@ export type PanelCommandPayload =
         startLocalTime: string;
         endLocalTime: string;
       };
+    }
+  | {
+      action: "UPDATE_SHADOW_KEYS";
+      shadowKeys: {
+        relay_state?: "ON" | "OFF";
+        device_state?: "ON" | "OFF";
+        timeToAutoTurnOn?: string;
+        timeToAutoTurnOff?: string;
+      };
     };
 
 export type PanelCommandResult = {

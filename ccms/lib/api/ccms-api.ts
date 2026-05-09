@@ -158,20 +158,24 @@ export async function postPanelCommand(
   let patchBody: any = { panel_id: panelId };
   
   if (payload.action === "SET_MANUAL_STATE") {
-    patchBody.desired_state = payload.manualState;
+    // Convert ON/OFF to boolean for Lambda
+    patchBody.desired_state = payload.manualState === "ON";
   } else if (payload.action === "UPDATE_RTC_SCHEDULE") {
     patchBody.schedule = payload.schedule;
+  } else if (payload.action === "UPDATE_SHADOW_KEYS") {
+    patchBody = { ...patchBody, ...payload.shadowKeys };
   }
 
-  await apiRequest<any>(`DashboardAPIHandler`, {
+  const response = await apiRequest<any>(`DashboardAPIHandler`, {
     method: "PATCH",
     body: patchBody,
   });
 
   return {
-    requestId: Math.random().toString(36).slice(2),
-    accepted: true,
+    requestId: response.requestId || Math.random().toString(36).slice(2),
+    accepted: response.accepted ?? true,
     updatedDesiredAtUtc: new Date().toISOString(),
+    message: response.message || "Command dispatched successfully",
   };
 }
 

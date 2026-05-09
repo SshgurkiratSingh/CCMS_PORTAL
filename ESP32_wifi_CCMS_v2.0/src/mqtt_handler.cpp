@@ -35,6 +35,8 @@ void handleMQTTConnection()
         displayStatusMessage("MQTT Connected.");
         mqttClient.subscribe(SHADOW_DELTA_TOPIC);
         Serial.println("Subscribed to Shadow Delta Topic");
+        mqttClient.subscribe(SHADOW_UPDATE_TOPIC);
+        Serial.println("Subscribed to Shadow Update Topic");
         lastReconnectAttempt = 0;
         delay(1000);
       }

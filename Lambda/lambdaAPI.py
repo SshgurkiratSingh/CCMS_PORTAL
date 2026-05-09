@@ -4,6 +4,7 @@ from decimal import Decimal
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 import logging
+import os
 
 # Configure logging
 logger = logging.getLogger()
@@ -14,6 +15,115 @@ ssm = boto3.client('ssm')
 dynamodb = boto3.resource('dynamodb')
 TABLE_TELEMETRY = dynamodb.Table('MeterTelemetry')
 TABLE_METADATA = dynamodb.Table('PanelMetadata')
+
+# AWS IoT Client
+try:
+    import boto3
+    iot_client = boto3.client('iot-data')
+except Exception as e:
+    logger.warning(f"Could not initialize IoT client: {e}")
+    iot_client = None
+
+
+def get_panel_device_id(panel_id):
+    """Retrieves the device_id/MQTT client ID from DynamoDB."""
+    try:
+        res = TABLE_METADATA.get_item(Key={'panel_id': panel_id})
+        item = res.get('Item', {})
+        
+        # Try to get device_id, fall back to panel_id
+        device_id = item.get('device_id') or item.get('deviceId') or panel_id
+        return device_id
+    except Exception as e:
+        logger.error(f"Error getting device_id for panel {panel_id}: {e}")
+        return panel_id
+
+
+def publish_mqtt_command(panel_id, command_type, state_value):
+    """Publishes commands to AWS IoT MQTT topics."""
+    if iot_client is None:
+        logger.error("IoT client not available")
+        return False
+    
+    try:
+        device_id = get_panel_device_id(panel_id)
+        
+        # Build MQTT payload in AWS IoT Device Shadow format
+        # Use snake_case for ESP32 compatibility
+        if command_type == 'relay_state':
+            payload = {
+                "state": {
+                    "desired": {
+                        "relay_state": state_value
+                    }
+                }
+            }
+        elif command_type == 'schedule':
+            payload = {
+                "state": {
+                    "desired": {
+                        "timeToAutoTurnOn": state_value.get('startLocalTime'),
+                        "timeToAutoTurnOff": state_value.get('endLocalTime')
+                    }
+                }
+            }
+        elif command_type == 'shadowKeys':
+            payload = {
+                "state": {
+                    "desired": state_value
+                }
+            }
+        else:
+            payload = {
+                "state": {
+                    "desired": {
+                        command_type: state_value
+                    }
+                }
+            }
+        
+        topic = f"$aws/things/{device_id}/shadow/update"
+        
+        logger.info(f"Publishing to MQTT topic: {topic}")
+        logger.info(f"MQTT payload: {json.dumps(payload)}")
+        
+        response = iot_client.publish(
+            topic=topic,
+            qos=1,
+            payload=json.dumps(payload)
+        )
+        
+        logger.info(f"MQTT publish successful: {response}")
+        return True
+        
+    except ClientError as e:
+        logger.error(f"MQTT publish failed: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error publishing MQTT: {e}")
+        return False
+
+
+def update_panel_state_in_db(panel_id, state_updates):
+    """Updates panel state in DynamoDB."""
+    try:
+        # Build update expression
+        update_expr = "SET " + ", ".join([f"#{k}=:{k}" for k in state_updates.keys()])
+        expr_attr_names = {f"#{k}": k for k in state_updates.keys()}
+        expr_attr_values = {f":{k}": v for k, v in state_updates.items()}
+        
+        TABLE_METADATA.update_item(
+            Key={'panel_id': panel_id},
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=expr_attr_names,
+            ExpressionAttributeValues=expr_attr_values
+        )
+        
+        logger.info(f"Successfully updated panel {panel_id} in DynamoDB")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to update panel {panel_id} in DynamoDB: {e}")
+        return False
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -69,13 +179,13 @@ def validate_timestamps(start_param, end_param):
     try:
         start_ts = int(start_param) if start_param else 0
         end_ts = int(end_param) if end_param else 2147483647000
-
+        
         if start_ts < 0 or end_ts < 0:
             return None, None, 'Timestamps must be non-negative integers.'
-
+        
         if start_ts > end_ts:
             return None, None, 'Start timestamp cannot be greater than end timestamp.'
-
+            
         # Convert to zero-padded strings for proper lexicographic sorting in DynamoDB
         # Using 13 digits to handle timestamps up to year 2286
         return str(start_ts).zfill(13), str(end_ts).zfill(13), None
@@ -97,11 +207,11 @@ def lambda_handler(event, context):
 
         # 2. DUAL-KEY AUTHENTICATION BARRICADE
         dash_key, admin_key = get_vault_keys()
-
+        
         if not dash_key or not admin_key:
             logger.error("Failed to retrieve authentication keys from SSM")
             return build_response(500, {'error': 'Authentication system unavailable.'})
-
+            
         client_dash = headers.get('x-dashboard-key', '').strip()
         client_admin = headers.get('x-admin-key', '').strip()
 
@@ -116,8 +226,7 @@ def lambda_handler(event, context):
 
         # 3. GLOBAL PARSING
         try:
-            body = json.loads(event.get('body', '{}'),
-                              parse_float=Decimal) if event.get('body') else {}
+            body = json.loads(event.get('body', '{}'), parse_float=Decimal) if event.get('body') else {}
         except json.JSONDecodeError as e:
             return build_response(400, {'error': f'Invalid JSON in request body: {str(e)}'})
 
@@ -130,38 +239,35 @@ def lambda_handler(event, context):
             # ENQUIRY: Historical Telemetry
             if query_params.get('enquiry') == 'history':
                 p_id = query_params.get('panel_id')
-                is_valid, error_msg = validate_panel_id(
-                    p_id, 'history enquiry')
+                is_valid, error_msg = validate_panel_id(p_id, 'history enquiry')
                 if not is_valid:
                     return build_response(400, {'error': error_msg})
 
                 start_ts, end_ts, ts_error = validate_timestamps(
-                    query_params.get('start'),
+                    query_params.get('start'), 
                     query_params.get('end')
                 )
                 if ts_error:
                     return build_response(400, {'error': ts_error})
 
                 try:
-                    logger.info(
-                        f"Querying telemetry for panel_id: {p_id}, start: {start_ts}, end: {end_ts}")
-
+                    logger.info(f"Querying telemetry for panel_id: {p_id}, start: {start_ts}, end: {end_ts}")
+                    
                     # Query with string timestamps to match DynamoDB table schema
                     logs = TABLE_TELEMETRY.query(
                         KeyConditionExpression=Key('meter_id').eq(p_id) & Key(
                             'timestamp').between(start_ts, end_ts),
                         ScanIndexForward=True
                     ).get('Items', [])
-
+                    
                     logger.info(f"Retrieved {len(logs)} telemetry records")
                     return build_response(200, logs)
-
+                    
                 except ClientError as e:
                     error_code = e.response['Error']['Code']
                     error_message = e.response['Error']['Message']
-                    logger.error(
-                        f"DynamoDB query failed for history - Code: {error_code}, Message: {error_message}")
-
+                    logger.error(f"DynamoDB query failed for history - Code: {error_code}, Message: {error_message}")
+                    
                     if error_code == 'ValidationException':
                         return build_response(400, {'error': f'Invalid query parameters: {error_message}'})
                     elif error_code == 'ResourceNotFoundException':
@@ -169,8 +275,7 @@ def lambda_handler(event, context):
                     else:
                         return build_response(500, {'error': 'Failed to retrieve telemetry history.'})
                 except Exception as e:
-                    logger.error(
-                        f"Unexpected error during telemetry query: {str(e)}")
+                    logger.error(f"Unexpected error during telemetry query: {str(e)}")
                     return build_response(500, {'error': 'Failed to retrieve telemetry history.'})
 
             # ENQUIRY: Global System Snapshot (All Panels + Logs)
@@ -183,15 +288,13 @@ def lambda_handler(event, context):
                     for panel in all_panels:
                         p_id = panel.get('panel_id')
                         if not p_id:
-                            logger.warning(
-                                f"Panel found without panel_id: {panel}")
+                            logger.warning(f"Panel found without panel_id: {panel}")
                             continue
-
+                            
                         try:
                             # Pull latest 5 logs for each panel
                             logs = TABLE_TELEMETRY.query(
-                                KeyConditionExpression=Key(
-                                    'meter_id').eq(p_id),
+                                KeyConditionExpression=Key('meter_id').eq(p_id),
                                 ScanIndexForward=False,
                                 Limit=5
                             ).get('Items', [])
@@ -201,22 +304,19 @@ def lambda_handler(event, context):
                                 'recent_logs': logs
                             })
                         except ClientError as e:
-                            logger.warning(
-                                f"Failed to get logs for panel {p_id}: {str(e)}")
+                            logger.warning(f"Failed to get logs for panel {p_id}: {str(e)}")
                             snapshot.append({
                                 'metadata': panel,
                                 'recent_logs': [],
                                 'error': 'Failed to retrieve recent logs'
                             })
-
-                    logger.info(
-                        f"System snapshot completed with {len(snapshot)} panels")
+                            
+                    logger.info(f"System snapshot completed with {len(snapshot)} panels")
                     return build_response(200, snapshot)
-
+                    
                 except ClientError as e:
                     error_code = e.response['Error']['Code']
-                    logger.error(
-                        f"DynamoDB scan failed for snapshot - Code: {error_code}")
+                    logger.error(f"DynamoDB scan failed for snapshot - Code: {error_code}")
                     return build_response(500, {'error': 'Failed to retrieve system snapshot.'})
                 except Exception as e:
                     logger.error(f"Unexpected error during snapshot: {str(e)}")
@@ -224,32 +324,28 @@ def lambda_handler(event, context):
 
             # Standard Logic: Single Panel Metadata
             else:
-                is_valid, error_msg = validate_panel_id(
-                    panel_id, 'metadata retrieval')
+                is_valid, error_msg = validate_panel_id(panel_id, 'metadata retrieval')
                 if not is_valid:
                     return build_response(400, {'error': error_msg})
 
                 try:
-                    logger.info(
-                        f"Retrieving metadata for panel_id: {panel_id}")
+                    logger.info(f"Retrieving metadata for panel_id: {panel_id}")
                     res = TABLE_METADATA.get_item(Key={'panel_id': panel_id})
                     item = res.get('Item', {})
                     if not item:
                         return build_response(404, {'error': f'Panel {panel_id} not found.'})
                     return build_response(200, item)
-
+                    
                 except ClientError as e:
                     error_code = e.response['Error']['Code']
-                    logger.error(
-                        f"DynamoDB get_item failed - Code: {error_code}")
-
+                    logger.error(f"DynamoDB get_item failed - Code: {error_code}")
+                    
                     if error_code == 'ResourceNotFoundException':
                         return build_response(404, {'error': 'Panel metadata table not found.'})
                     else:
                         return build_response(500, {'error': 'Failed to retrieve panel metadata.'})
                 except Exception as e:
-                    logger.error(
-                        f"Unexpected error during metadata retrieval: {str(e)}")
+                    logger.error(f"Unexpected error during metadata retrieval: {str(e)}")
                     return build_response(500, {'error': 'Failed to retrieve panel metadata.'})
 
         # ==========================================
@@ -259,10 +355,9 @@ def lambda_handler(event, context):
             # Validate required fields
             if not body:
                 return build_response(400, {'error': 'Request body is required.'})
-
+                
             panel_id_from_body = body.get('panel_id')
-            is_valid, error_msg = validate_panel_id(
-                panel_id_from_body, 'panel creation/update')
+            is_valid, error_msg = validate_panel_id(panel_id_from_body, 'panel creation/update')
             if not is_valid:
                 return build_response(400, {'error': error_msg})
 
@@ -270,11 +365,11 @@ def lambda_handler(event, context):
                 logger.info(f"Creating/updating panel: {panel_id_from_body}")
                 TABLE_METADATA.put_item(Item=body)
                 return build_response(201, {'message': 'Command Executed: Panel Synchronized.'})
-
+                
             except ClientError as e:
                 error_code = e.response['Error']['Code']
                 logger.error(f"DynamoDB put_item failed - Code: {error_code}")
-
+                
                 if error_code == 'ValidationException':
                     return build_response(400, {'error': 'Invalid panel data format.'})
                 elif error_code == 'ResourceNotFoundException':
@@ -282,8 +377,7 @@ def lambda_handler(event, context):
                 else:
                     return build_response(500, {'error': 'Failed to create/update panel.'})
             except Exception as e:
-                logger.error(
-                    f"Unexpected error during panel creation/update: {str(e)}")
+                logger.error(f"Unexpected error during panel creation/update: {str(e)}")
                 return build_response(500, {'error': 'Failed to create/update panel.'})
 
         # ==========================================
@@ -297,49 +391,72 @@ def lambda_handler(event, context):
             if not body:
                 return build_response(400, {'error': 'Request body with update fields is required.'})
 
-            update_expr = []
-            attr_names = {}
-            attr_values = {}
+            # Check for relay control commands (desired_state)
+            desired_state = body.get('desired_state')
+            schedule = body.get('schedule')
+            
+            # Handle relay state control
+            if desired_state is not None:
+                state_value = str(desired_state).upper()
+                
+                # Update DynamoDB
+                db_update_success = update_panel_state_in_db(panel_id, {
+                    'desired_state': state_value
+                })
+                
+                # Publish to MQTT for actual device control (use snake_case for ESP32)
+                mqtt_success = publish_mqtt_command(panel_id, 'relay_state', state_value == "ON")
+                
+                return build_response(200, {
+                    'message': f'Relay {state_value} command dispatched',
+                    'panel_id': panel_id,
+                    'desired_state': state_value,
+                    'accepted': True,
+                    'requestId': f"CMD-{panel_id}-{id(body)}"
+                })
+            
+            # Handle schedule updates
+            elif schedule is not None:
+                start_time = schedule.get('startLocalTime')
+                end_time = schedule.get('endLocalTime')
+                
+                # Update DynamoDB
+                db_update_success = update_panel_state_in_db(panel_id, {
+                    'schedule': schedule
+                })
+                
+                # Publish to MQTT for actual device control
+                mqtt_success = publish_mqtt_command(panel_id, 'schedule', schedule)
+                
+                return build_response(200, {
+                    'message': f'Schedule updated: {start_time} - {end_time}',
+                    'panel_id': panel_id,
+                    'accepted': True,
+                    'requestId': f"CMD-{panel_id}-{id(body)}"
+                })
+            
+            # Handle shadow keys updates
+            else:
+                shadow_keys = ['relay_state', 'device_state', 'timeToAutoTurnOn', 'timeToAutoTurnOff']
+                
+                # Filter to only include shadow keys in the update
+                update_fields = {k: v for k, v in body.items() if k in shadow_keys}
+                
+                if not update_fields:
+                    return build_response(400, {'error': f'No valid shadow keys provided. Valid keys: {shadow_keys}'})
 
-            i = 0
-            for k, v in body.items():
-                if k == 'panel_id':
-                    continue
-
-                name_token = f"#n{i}"
-                value_token = f":v{i}"
-                attr_names[name_token] = k
-                attr_values[value_token] = v
-                update_expr.append(f"{name_token} = {value_token}")
-                i += 1
-
-            if not update_expr:
-                return build_response(400, {'error': 'No valid fields provided to update.'})
-
-            try:
-                logger.info(f"Patching panel: {panel_id}")
-                TABLE_METADATA.update_item(
-                    Key={'panel_id': panel_id},
-                    UpdateExpression="SET " + ", ".join(update_expr),
-                    ExpressionAttributeNames=attr_names,
-                    ExpressionAttributeValues=attr_values
-                )
-                return build_response(200, {'message': 'Operational state patched.'})
-
-            except ClientError as e:
-                error_code = e.response['Error']['Code']
-                logger.error(
-                    f"DynamoDB update_item failed - Code: {error_code}")
-
-                if error_code == 'ResourceNotFoundException':
-                    return build_response(404, {'error': f'Panel {panel_id} not found.'})
-                elif error_code == 'ValidationException':
-                    return build_response(400, {'error': 'Invalid update data format.'})
-                else:
-                    return build_response(500, {'error': 'Failed to update panel.'})
-            except Exception as e:
-                logger.error(f"Unexpected error during panel patch: {str(e)}")
-                return build_response(500, {'error': 'Failed to update panel.'})
+                # Update DynamoDB
+                db_update_success = update_panel_state_in_db(panel_id, update_fields)
+                
+                # Publish to MQTT for actual device control
+                mqtt_success = publish_mqtt_command(panel_id, 'shadowKeys', update_fields)
+                
+                return build_response(200, {
+                    'message': 'Shadow keys updated successfully',
+                    'panel_id': panel_id,
+                    'accepted': True,
+                    'requestId': f"CMD-{panel_id}-{id(body)}"
+                })
 
         # ==========================================
         # DELETE: DECOMMISSION (Admin Only)
@@ -350,29 +467,26 @@ def lambda_handler(event, context):
                 return build_response(400, {'error': error_msg})
 
             try:
-                logger.info(
-                    f"Checking existence of panel before deletion: {panel_id}")
+                logger.info(f"Checking existence of panel before deletion: {panel_id}")
                 # Check if panel exists before deletion
                 res = TABLE_METADATA.get_item(Key={'panel_id': panel_id})
                 if not res.get('Item'):
                     return build_response(404, {'error': f'Panel {panel_id} not found.'})
-
+                    
                 logger.info(f"Deleting panel: {panel_id}")
                 TABLE_METADATA.delete_item(Key={'panel_id': panel_id})
                 return build_response(200, {'message': 'Panel decommissioned and purged.'})
-
+                
             except ClientError as e:
                 error_code = e.response['Error']['Code']
-                logger.error(
-                    f"DynamoDB delete_item failed - Code: {error_code}")
-
+                logger.error(f"DynamoDB delete_item failed - Code: {error_code}")
+                
                 if error_code == 'ResourceNotFoundException':
                     return build_response(404, {'error': 'Panel metadata table not found.'})
                 else:
                     return build_response(500, {'error': 'Failed to delete panel.'})
             except Exception as e:
-                logger.error(
-                    f"Unexpected error during panel deletion: {str(e)}")
+                logger.error(f"Unexpected error during panel deletion: {str(e)}")
                 return build_response(500, {'error': 'Failed to delete panel.'})
 
         else:
