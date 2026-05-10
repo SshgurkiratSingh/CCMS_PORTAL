@@ -98,9 +98,14 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
     // Get desired state (for update topic) or direct state (for delta topic)
     JsonObject desiredState = state["desired"].is<JsonObject>() ? state["desired"].as<JsonObject>() : state;
     
+    // For delta messages, state might be directly under "state" object
+    if (isDelta && desiredState.size() == 0) {
+      desiredState = state;
+    }
+    
     bool stateChanged = false;
 
-    // PARSE RELAY COMMAND - Handle both camelCase and snake_case
+    // PARSE RELAY COMMAND - Handle both camelCase and snake_case, and string "ON"/"OFF" values
     if (desiredState["relayState"].is<bool>())
     {
       currentRelayState = desiredState["relayState"];
@@ -116,6 +121,25 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
       Serial.print("Relay GPIO switched to: ");
       Serial.println(currentRelayState ? "ON" : "OFF");
       stateChanged = true;
+    }
+    else if (desiredState["relay_state"].is<String>())
+    {
+      String relayStateStr = desiredState["relay_state"].as<String>();
+      relayStateStr.toUpperCase();
+      if (relayStateStr == "ON")
+      {
+        currentRelayState = true;
+        digitalWrite(RELAY_PIN, HIGH);
+        Serial.println("Relay GPIO switched to: ON");
+        stateChanged = true;
+      }
+      else if (relayStateStr == "OFF")
+      {
+        currentRelayState = false;
+        digitalWrite(RELAY_PIN, LOW);
+        Serial.println("Relay GPIO switched to: OFF");
+        stateChanged = true;
+      }
     }
 
     // PARSE TIMING/SCHEDULE COMMANDS - Handle both camelCase and snake_case
@@ -145,7 +169,7 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
       stateChanged = true;
     }
 
-    // PARSE DEVICE STATE - Handle both camelCase and snake_case
+    // PARSE DEVICE STATE - Handle both camelCase and snake_case, and string "ON"/"OFF" values
     if (desiredState["deviceState"].is<String>())
     {
       currentDeviceState = desiredState["deviceState"].as<String>();

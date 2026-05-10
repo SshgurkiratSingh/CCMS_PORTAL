@@ -46,7 +46,8 @@ def publish_mqtt_command(panel_id, command_type, state_value):
         return False
     
     try:
-        device_id = get_panel_device_id(panel_id)
+        # Fixed device ID for Meter_001
+        device_id = "Meter_001"
         
         # Build MQTT payload in AWS IoT Device Shadow format
         # Use snake_case for ESP32 compatibility
