@@ -32,8 +32,8 @@ extern const char *mqtt_topic;
 #define LED1_PIN 25
 #define LED2_PIN 26
 #define LED3_PIN 27
-#define BRIDGE_TX 12
-#define BRIDGE_RX 13
+#define BRIDGE_TX 13
+#define BRIDGE_RX 12
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64

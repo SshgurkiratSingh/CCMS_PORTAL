@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { acknowledgeAlert, getAlerts } from "@/lib/api/ccms-api";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { acknowledgeAlert, getAlerts, getPanelTelemetry, getPanels } from "@/lib/api/ccms-api";
 import { useAuth } from "@/components/auth-provider";
-import type { AlertRecord, AlertSeverity } from "@/lib/api/types";
+import type { AlertRecord, AlertSeverity, PanelRecord, TelemetryPoint } from "@/lib/api/types";
+import { generateAlertsFromTelemetry, type GeneratedAlert } from "@/lib/alert-generator";
 import {
   BellRing,
   ShieldAlert,
@@ -52,14 +53,47 @@ export default function AlertsPage() {
     "ACTIVE" | "ACKNOWLEDGED" | "ALL"
   >("ACTIVE");
   const [allAlerts, setAllAlerts] = useState<AlertRecord[]>([]);
+  const [generatedAlerts, setGeneratedAlerts] = useState<GeneratedAlert[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showGeneratedOnly, setShowGeneratedOnly] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getAlerts();
-      setAllAlerts(response.items);
+      const [alertsResponse, panelsResponse] = await Promise.all([
+        getAlerts(),
+        getPanels({ limit: 1000 }),
+      ]);
+      setAllAlerts(alertsResponse.items);
+
+      // Generate alerts from telemetry for each panel
+      const now = new Date();
+      const last24h = new Date(now.getTime() - 24 * 3600 * 1000);
+
+      const newGeneratedAlerts: GeneratedAlert[] = [];
+
+      for (const panel of panelsResponse.items) {
+        try {
+          const telemetry = await getPanelTelemetry({
+            panelId: panel.panelId,
+            startUtcIso: last24h.toISOString(),
+            endUtcIso: now.toISOString(),
+          });
+
+          if (telemetry.points.length > 0) {
+            const panelAlerts = generateAlertsFromTelemetry(
+              panel.panelId,
+              telemetry.points
+            );
+            newGeneratedAlerts.push(...panelAlerts);
+          }
+        } catch (panelError) {
+          console.warn(`Failed to generate alerts for panel ${panel.panelId}:`, panelError);
+        }
+      }
+
+      setGeneratedAlerts(newGeneratedAlerts);
       setError(null);
     } catch (loadError) {
       setError(
@@ -70,7 +104,7 @@ export default function AlertsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void load();
@@ -106,20 +140,23 @@ export default function AlertsPage() {
   };
 
   const filteredAlerts = useMemo(
-    () =>
-      allAlerts.filter((a) => {
+    () => {
+      const alertsToFilter = showGeneratedOnly ? generatedAlerts : [...allAlerts, ...generatedAlerts];
+      return alertsToFilter.filter((a) => {
         const matchSeverity =
           severityFilter === "ALL" || a.severity === severityFilter;
         const matchStatus = statusFilter === "ALL" || a.status === statusFilter;
         return matchSeverity && matchStatus;
-      }),
-    [allAlerts, severityFilter, statusFilter],
+      });
+    },
+    [allAlerts, generatedAlerts, severityFilter, statusFilter, showGeneratedOnly],
   );
 
-  const activeCount = allAlerts.filter((a) => a.status === "ACTIVE").length;
-  const criticalCount = allAlerts.filter(
+  const displayAlerts = showGeneratedOnly ? generatedAlerts : allAlerts;
+  const activeCount = displayAlerts.filter((a) => a.status === "ACTIVE").length + generatedAlerts.length;
+  const criticalCount = displayAlerts.filter(
     (a) => a.status === "ACTIVE" && a.severity === "CRITICAL",
-  ).length;
+  ).length + generatedAlerts.filter((a) => a.severity === "CRITICAL").length;
 
   return (
     <section className="space-y-6">
@@ -142,10 +179,24 @@ export default function AlertsPage() {
           </p>
           <p className="text-3xl font-bold text-amber-400">{activeCount}</p>
         </SectionCard>
+        <SectionCard className="p-4 border-indigo-900/40 bg-indigo-950/15">
+          <p className="text-xs uppercase tracking-wide text-indigo-400/80 font-semibold mb-1">
+            Generated (24h)
+          </p>
+          <p className="text-3xl font-bold text-indigo-400">{generatedAlerts.length}</p>
+        </SectionCard>
 
-        <div className="md:col-span-2">
+        <div className="md:col-span-1">
           <Toolbar>
             <div className="flex flex-wrap items-center gap-3 w-full">
+              <Button
+                onPress={() => setShowGeneratedOnly(!showGeneratedOnly)}
+                size="sm"
+                variant={showGeneratedOnly ? "primary" : "secondary"}
+                className={showGeneratedOnly ? "bg-indigo-600" : ""}
+              >
+                {showGeneratedOnly ? "Generated Alerts" : "All Alerts"}
+              </Button>
               <NativeSelect
                 value={statusFilter}
                 onChange={(v) => setStatusFilter(v as typeof statusFilter)}
@@ -211,6 +262,11 @@ export default function AlertsPage() {
                     </h3>
                     <SeverityChip severity={alert.severity} />
                     <FaultCodeTag code={alert.faultCode} />
+                    {(alert as GeneratedAlert).detectionRule && (
+                      <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/30 text-xs text-indigo-300">
+                        {(alert as GeneratedAlert).detectionRule}
+                      </span>
+                    )}
                   </div>
                   <div className="text-sm text-slate-400 flex items-center gap-3">
                     <span>
@@ -226,6 +282,11 @@ export default function AlertsPage() {
                       })}
                     </span>
                   </div>
+                  {(alert as GeneratedAlert).detectionDetails && (
+                    <div className="text-xs text-slate-500 italic mt-1">
+                      {(alert as GeneratedAlert).detectionDetails}
+                    </div>
+                  )}
                 </div>
               </div>
 
