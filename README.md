@@ -1,18 +1,22 @@
 # CCMS Portal — Centralized Command & Monitoring System
 
-A full-stack smart streetlight fleet management system with real-time monitoring, remote control, and analytics. This monorepo contains the Next.js operator console, AWS Lambda backend, and ESP32 firmware for the edge devices.
+A full-stack smart streetlight fleet management system with real-time monitoring, remote control, and analytics. This monorepo contains the Next.js operator console, AWS Lambda backend, ESP32 firmware for the edge devices, and PCB designs.
 
-## Screenshots
+## Screenshots & Assets
 
-| Fleet Overview | Panel Command Center | System Architecture |
+| Fleet Info | Node Info | Command Menu |
 |:---:|:---:|:---:|
-| ![Fleet](docs/Assets/fleet%20screen.png) | ![Panel](docs/Assets/Panel%20command%20center.png) | ![Architecture](docs/Assets/Modular%20Centralised%20Management%20System1.png) |
+| ![Fleet](docs/Assets/fleetInfo.png) | ![Node](docs/Assets/WebportalShowingNodeInfo.png) | ![Command](docs/Assets/CommandMenu.png) |
+
+| Prototype | Power Supply Unit | Offsite Interface Card |
+|:---:|:---:|:---:|
+| ![Prototype](docs/Assets/prototype1.png) | ![PSU](docs/Assets/Power%20Supply%20Unit%20Card.png) | ![OIC](docs/Assets/offsite%20Interface%20Card.png) |
 
 ---
 
 ## Architecture Overview
 
-```
+```text
 ┌──────────────────┐       ┌──────────────┐       ┌─────────────────┐
 │   ESP32 Nodes    │──────▶│   AWS IoT    │──────▶│  SQS → Lambda   │──────▶ DynamoDB
 │  (streetlights)  │  MQTT │   Core       │       │ (saveDataFromSQ)│
@@ -30,16 +34,17 @@ A full-stack smart streetlight fleet management system with real-time monitoring
 
 | Layer                             | Technology                            | Location                                                         |
 | --------------------------------- | ------------------------------------- | ---------------------------------------------------------------- |
-| **Web Portal**              | Next.js 16, React 19, Tailwind CSS v4 | [`ccms/`](./ccms)                                                 |
-| **Backend API**             | Python AWS Lambda                     | [`Lambda/`](./Lambda)                                             |
-| **Firmware v2.0**           | C++ (PlatformIO), ESP32               | [`ESP32_wifi_CCMS_v2.0/`](./ESP32_wifi_CCMS_v2.0)                 |
-| **Firmware v2.0 (Pi link)** | C++ (PlatformIO), ESP32               | [`ESP32_wifi_CCMS_v2.0_PI_link/`](./ESP32_wifi_CCMS_v2.0_PI_link) |
-| **Firmware v1.0**           | C++ (PlatformIO), ESP32               | [`ESP32_wifi_CCMS_v1.0/`](./ESP32_wifi_CCMS_v1.0)                 |
-| **Documentation**           | MkDocs (Material theme)               | [`docs/`](./docs), [`mkdocs.yml`](./mkdocs.yml)                    |
+| **Web Portal**                    | Next.js 16, React 19, Tailwind CSS v4 | [`Frontend/ccms/`](./Frontend/ccms)                              |
+| **Backend API**                   | Python AWS Lambda                     | [`Backend/Lambda/`](./Backend/Lambda)                            |
+| **Firmware v2.0**                 | C++ (PlatformIO), ESP32               | [`Firmware/ESP32_wifi_CCMS_v2.0/`](./Firmware/ESP32_wifi_CCMS_v2.0) |
+| **Firmware v2.0 (Pi link)**       | C++ (PlatformIO), ESP32               | [`Firmware/ESP32_wifi_CCMS_v2.0_PI_link/`](./Firmware/ESP32_wifi_CCMS_v2.0_PI_link) |
+| **Firmware v1.0**                 | C++ (PlatformIO), ESP32               | [`Firmware/ESP32_wifi_CCMS_v1.0/`](./Firmware/ESP32_wifi_CCMS_v1.0) |
+| **Hardware**                      | PCB Designs                           | [`Hardware/PCB Designs/`](./Hardware/PCB%20Designs)              |
+| **Documentation**                 | MkDocs (Material theme)               | [`docs/`](./docs), [`mkdocs.yml`](./mkdocs.yml)                  |
 
 ---
 
-## Frontend — Operator Console (`ccms/`)
+## Frontend — Operator Console (`Frontend/ccms/`)
 
 A Next.js static export application that provides a real-time operations dashboard for managing streetlight fleets.
 
@@ -71,20 +76,20 @@ A Next.js static export application that provides a real-time operations dashboa
 NEXT_PUBLIC_API_BASE_URL=<Lambda API Gateway endpoint>
 ```
 
-Copy `ccms/.env.example` → `ccms/.env.local` and fill in real values.
+Copy `Frontend/ccms/.env.example` → `Frontend/ccms/.env.local` and fill in real values.
 
 ### Run Locally
 
 ```bash
-cd ccms
+cd Frontend/ccms
 npm install
 npm run dev       # development server at http://localhost:3000
-npm run build     # static export to ccms/out/
+npm run build     # static export to Frontend/ccms/out/
 ```
 
 ---
 
-## Backend — AWS Lambda (`Lambda/`)
+## Backend — AWS Lambda (`Backend/Lambda/`)
 
 Python-based serverless functions deployed behind API Gateway.
 
@@ -92,8 +97,8 @@ Python-based serverless functions deployed behind API Gateway.
 
 | File                                                         | Purpose                                                                            |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| [`lambdaAPI.py`](./Lambda/lambdaAPI.py)                       | REST API handler — serves dashboard snapshot, panel status, history, and commands |
-| [`saveDataFromSQStoDB,py`](./Lambda/saveDataFromSQStoDB%2Cpy) | SQS-triggered function that writes incoming telemetry to DynamoDB                  |
+| [`lambdaAPI.py`](./Backend/Lambda/lambdaAPI.py)                       | REST API handler — serves dashboard snapshot, panel status, history, and commands |
+| [`saveDataFromSQStoDB,py`](./Backend/Lambda/saveDataFromSQStoDB,py) | SQS-triggered function that writes incoming telemetry to DynamoDB                  |
 
 ### API Endpoints (via `DashboardAPIHandler`)
 
@@ -106,7 +111,7 @@ Python-based serverless functions deployed behind API Gateway.
 
 ### Test Endpoints
 
-A Node.js test script is available at [`Lambda/TestEndpoints/getData.js`](./Lambda/TestEndpoints/getData.js) for manual API testing.
+A Node.js test script is available at [`Backend/Lambda/TestEndpoints/getData.js`](./Backend/Lambda/TestEndpoints/getData.js) for manual API testing.
 
 ---
 
@@ -126,12 +131,12 @@ Three firmware variants included:
 - **MQTT / AWS IoT Core**: Publishes telemetry; subscribes to shadow updates for relay commands
 - **Schneeler Power Meters**: Reads energy parameters via Modbus (registers R3027–R3083)
 - **Relay Control**: Manual ON/OFF, RTC-scheduled, or shadow-key-based switching
-- **Decoders**: [`ccms/decoders/fs-i6-ppm/`](./ccms/decoders/fs-i6-ppm) — PPM signal decoder documentation
+- **Decoders**: [`Frontend/ccms/decoders/fs-i6-ppm/`](./Frontend/ccms/decoders/fs-i6-ppm) — PPM signal decoder documentation
 
 Build with [PlatformIO](https://platformio.org/):
 
 ```bash
-cd ESP32_wifi_CCMS_v2.0
+cd Firmware/ESP32_wifi_CCMS_v2.0
 pio run -t upload
 ```
 
@@ -139,7 +144,7 @@ pio run -t upload
 
 ## API Types
 
-All frontend types are defined in [`ccms/lib/api/types.ts`](./ccms/lib/api/types.ts). Key models:
+All frontend types are defined in [`Frontend/ccms/lib/api/types.ts`](./Frontend/ccms/lib/api/types.ts). Key models:
 
 - **PanelRecord** — panel metadata, status, GPS coordinates
 - **PanelLiveStatus** — real-time telemetry snapshot (voltage, current, power factor, frequency, battery, temperature, tilt)
@@ -164,7 +169,7 @@ The documentation is auto-deployed via [GitHub Actions](https://github.com/setti
 
 ### Included Docs
 
-- [Frontend &amp; Lambda Report](./docs/frontend-lambda-project-report.md)
+- [Frontend & Lambda Report](./docs/frontend-lambda-project-report.md)
 - [Web Portal Guide](./docs/web-portal.md)
 - [Hardware (ESP32)](./docs/hardware.md)
 - [Lambda Backend](./docs/lambda.md)
@@ -181,23 +186,18 @@ The documentation is auto-deployed via [GitHub Actions](https://github.com/setti
 
 ## Project Structure
 
-```
+```text
 CCMS_PORTAL/
-├── ccms/                          ← Next.js operator console
-│   ├── app/                       ← Pages, layouts, routes
-│   ├── components/                ← React components (maps, auth, UI)
-│   ├── lib/
-│   │   ├── api/                   ← HTTP client + typed API functions
-│   │   ├── auth/                  ← Session/key management
-│   │   └── register-map.json      ← Panel registration coordinate defaults
-│   └── public/                    ← Static assets
-├── Lambda/                        ← AWS Lambda backend
-│   ├── lambdaAPI.py
-│   ├── saveDataFromSQStoDB,py
-│   └── TestEndpoints/             ← API testing scripts
-├── ESP32_wifi_CCMS_v1.0/          ← Firmware v1.0
-├── ESP32_wifi_CCMS_v2.0/          ← Firmware v2.0
-├── ESP32_wifi_CCMS_v2.0_PI_link/  ← Firmware v2.0 (Pi link variant)
+├── Frontend/
+│   └── ccms/                          ← Next.js operator console
+├── Backend/
+│   └── Lambda/                        ← AWS Lambda backend
+├── Firmware/
+│   ├── ESP32_wifi_CCMS_v1.0/          ← Firmware v1.0
+│   ├── ESP32_wifi_CCMS_v2.0/          ← Firmware v2.0
+│   └── ESP32_wifi_CCMS_v2.0_PI_link/  ← Firmware v2.0 (Pi link variant)
+├── Hardware/
+│   └── PCB Designs/                   ← Hardware designs
 ├── docs/                          ← MkDocs documentation source
 ├── mkdocs.yml                     ← Documentation site configuration
 └── .github/workflows/             ← CI/CD pipelines

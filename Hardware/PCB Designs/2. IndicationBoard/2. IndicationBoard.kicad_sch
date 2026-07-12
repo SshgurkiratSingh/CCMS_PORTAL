@@ -1,0 +1,224 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "9.0")
+	(uuid "ae6c7f51-4fa4-4517-a341-0f9382f8c85b")
+	(paper "A4")
+	(lib_symbols)
+	(sheet
+		(at 125.73 131.445)
+		(size 46.355 41.91)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "317463d4-e309-4502-81b7-cf77ca0a1a9c")
+		(property "Sheetname" "MountAndDebugs"
+			(at 125.73 130.7334 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "MountAndDebugs.kicad_sch"
+			(at 125.73 173.9396 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "2. IndicationBoard"
+				(path "/ae6c7f51-4fa4-4517-a341-0f9382f8c85b"
+					(page "6")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 199.39 27.305)
+		(size 58.42 67.31)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "3be0e968-5b62-4d20-bf7e-89e5558d8f60")
+		(property "Sheetname" "Connectivity (page 3)"
+			(at 199.39 26.5934 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "usbToMCU.kicad_sch"
+			(at 199.39 95.1996 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "2. IndicationBoard"
+				(path "/ae6c7f51-4fa4-4517-a341-0f9382f8c85b"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 29.845 24.765)
+		(size 67.31 69.85)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "42101dee-e1fb-47e0-9a86-d524b174053b")
+		(property "Sheetname" "MCU"
+			(at 29.845 24.0534 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "mcu.kicad_sch"
+			(at 29.845 95.1996 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "2. IndicationBoard"
+				(path "/ae6c7f51-4fa4-4517-a341-0f9382f8c85b"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 29.845 116.205)
+		(size 69.215 60.325)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "6475ae88-4cf6-4b6b-997a-1546679ceb1a")
+		(property "Sheetname" "StoreAndBoot"
+			(at 29.845 115.4934 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "StoreAndBoot.kicad_sch"
+			(at 29.845 177.1146 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "2. IndicationBoard"
+				(path "/ae6c7f51-4fa4-4517-a341-0f9382f8c85b"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 115.57 25.4)
+		(size 63.5 68.58)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "e6e46f3d-03f5-4eae-ab87-dd67a0795414")
+		(property "Sheetname" "InteractionZone"
+			(at 115.57 24.6884 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "InteractionZone.kicad_sch"
+			(at 115.57 94.5646 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "2. IndicationBoard"
+				(path "/ae6c7f51-4fa4-4517-a341-0f9382f8c85b"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

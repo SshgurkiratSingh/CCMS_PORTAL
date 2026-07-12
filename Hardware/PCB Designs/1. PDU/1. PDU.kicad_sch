@@ -1,0 +1,224 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "9.0")
+	(uuid "02f41c35-4158-4f09-b50a-a1b7ee58f0f7")
+	(paper "A4")
+	(lib_symbols)
+	(sheet
+		(at 130.175 100.965)
+		(size 56.515 27.94)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "06c6dfdb-0a43-4301-a70c-1467da398b41")
+		(property "Sheetname" "Relay Out"
+			(at 130.175 100.2534 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "RelayOut.kicad_sch"
+			(at 130.175 129.4896 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "1. PDU"
+				(path "/02f41c35-4158-4f09-b50a-a1b7ee58f0f7"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 134.62 20.955)
+		(size 87.63 63.5)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "1ba025de-e62b-4abe-9af8-359c2457030a")
+		(property "Sheetname" "Filter And Oring"
+			(at 134.62 20.2434 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Filter and Oring_sch.kicad_sch"
+			(at 134.62 85.0396 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "1. PDU"
+				(path "/02f41c35-4158-4f09-b50a-a1b7ee58f0f7"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 207.01 100.965)
+		(size 73.025 28.575)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "2026d987-af42-4da8-a446-dbd2486b28ab")
+		(property "Sheetname" "Rectify and Regulation"
+			(at 207.01 100.2534 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Rectifer and Regulation.kicad_sch"
+			(at 207.01 130.1246 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "1. PDU"
+				(path "/02f41c35-4158-4f09-b50a-a1b7ee58f0f7"
+					(page "6")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 24.765 19.685)
+		(size 78.105 65.405)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "4fb694a7-4052-4595-9cab-ba83a3cf5ea0")
+		(property "Sheetname" "Battery & Charging"
+			(at 24.765 18.9734 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "untitled.kicad_sch"
+			(at 24.765 85.6746 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "1. PDU"
+				(path "/02f41c35-4158-4f09-b50a-a1b7ee58f0f7"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 26.035 99.695)
+		(size 76.2 68.58)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "9d4e8755-ba52-4374-b3be-bf5a97ac51ee")
+		(property "Sheetname" "BIST and Telemetry"
+			(at 26.035 98.9834 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "atmgea_BISTandTelem.kicad_sch"
+			(at 26.035 168.8596 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "1. PDU"
+				(path "/02f41c35-4158-4f09-b50a-a1b7ee58f0f7"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)
