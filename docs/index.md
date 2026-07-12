@@ -6,13 +6,11 @@ Welcome to the **Centralized Command & Monitoring System** (CCMS) documentation.
 
 ## Screenshots
 
-| Fleet Info | Node Info | Command Menu |
-|:---:|:---:|:---:|
-| ![Fleet](Assets/fleetInfo.png) | ![Node](Assets/WebportalShowingNodeInfo.png) | ![Command](Assets/CommandMenu.png) |
+![Fleet Overview](Assets/fleet%20screen.png)
 
-| Prototype | Power Supply Unit | Offsite Interface Card |
-|:---:|:---:|:---:|
-| ![Prototype](Assets/prototype1.png) | ![PSU](Assets/Power%20Supply%20Unit%20Card.png) | ![OIC](Assets/offsite%20Interface%20Card.png) |
+![Panel Command Center](Assets/Panel%20command%20center.png)
+
+![Modular Centralised Management System](Assets/Modular%20Centralised%20Management%20System1.png)
 
 ---
 
