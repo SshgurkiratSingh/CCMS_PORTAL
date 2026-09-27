@@ -18,7 +18,7 @@ A full-stack smart streetlight fleet management system with real-time monitoring
 
 ```text
 ┌──────────────────┐       ┌──────────────┐       ┌─────────────────┐
-│   ESP32 Nodes    │──────▶│   AWS IoT    │──────▶│  SQS → Lambda   │──────▶ DynamoDB
+│ RPi Gateway + STM│──────▶│   AWS IoT    │──────▶│  SQS → Lambda   │──────▶ DynamoDB
 │  (streetlights)  │  MQTT │   Core       │       │ (saveDataFromSQ)│
 └──────────────────┘       └──────────────┘       └─────────────────┘
                                                           │
@@ -36,6 +36,8 @@ A full-stack smart streetlight fleet management system with real-time monitoring
 | --------------------------------- | ------------------------------------- | ---------------------------------------------------------------- |
 | **Web Portal**                    | Next.js 16, React 19, Tailwind CSS v4 | [`Frontend/ccms/`](./Frontend/ccms)                              |
 | **Backend API**                   | Python AWS Lambda                     | [`Backend/Lambda/`](./Backend/Lambda)                            |
+| **Firmware (RPi Gateway)**        | Python 3                              | [`Firmware/RPi_Gateway/`](./Firmware/RPi_Gateway)                |
+| **Firmware (STM32 Node)**         | C++ (PlatformIO), STM32               | [`Firmware/STM32_Peripheral/`](./Firmware/STM32_Peripheral)      |
 | **Firmware v2.0**                 | C++ (PlatformIO), ESP32               | [`Firmware/ESP32_wifi_CCMS_v2.0/`](./Firmware/ESP32_wifi_CCMS_v2.0) |
 | **Firmware v2.0 (Pi link)**       | C++ (PlatformIO), ESP32               | [`Firmware/ESP32_wifi_CCMS_v2.0_PI_link/`](./Firmware/ESP32_wifi_CCMS_v2.0_PI_link) |
 | **Firmware v1.0**                 | C++ (PlatformIO), ESP32               | [`Firmware/ESP32_wifi_CCMS_v1.0/`](./Firmware/ESP32_wifi_CCMS_v1.0) |
@@ -115,28 +117,29 @@ A Node.js test script is available at [`Backend/Lambda/TestEndpoints/getData.js`
 
 ---
 
-## Hardware — ESP32 Firmware
+## Hardware — Edge Firmware
 
-Three firmware variants included:
+The project supports both ESP32-centric designs and a new hybrid Raspberry Pi + STM32 architecture.
 
 | Variant                | Description                                                                 |
 | ---------------------- | --------------------------------------------------------------------------- |
-| **v1.0**         | Base implementation with WiFi, MQTT, and energy meter reading               |
-| **v2.0**         | Enhanced version with AWS IoT Core integration, relay control, OTA-ready    |
-| **v2.0 PI Link** | Variant designed to communicate via Raspberry Pi for additional relay logic |
+| **RPi Gateway**        | Python daemon acting as an IoT gateway, handling AWS IoT MQTT and Shadow.   |
+| **STM32 Peripheral**   | Hard-realtime STM32 node for sensors and Modbus, reports to RPi Gateway.    |
+| **v1.0 (ESP32)**       | Base implementation with WiFi, MQTT, and energy meter reading               |
+| **v2.0 (ESP32)**       | Enhanced version with AWS IoT Core integration, relay control, OTA-ready    |
+| **v2.0 PI Link (ESP32)** | Variant designed to communicate via Raspberry Pi for additional relay logic |
 
-### Key Hardware Interfaces
+### Key Hardware Interfaces (RPi + STM32)
 
-- **WiFi**: ESP32 connects to local network
-- **MQTT / AWS IoT Core**: Publishes telemetry; subscribes to shadow updates for relay commands
-- **Schneeler Power Meters**: Reads energy parameters via Modbus (registers R3027–R3083)
-- **Relay Control**: Manual ON/OFF, RTC-scheduled, or shadow-key-based switching
-- **Decoders**: [`Frontend/ccms/decoders/fs-i6-ppm/`](./Frontend/ccms/decoders/fs-i6-ppm) — PPM signal decoder documentation
+- **Raspberry Pi**: Network handling (WiFi/Ethernet), AWS IoT Core communication.
+- **Serial (UART)**: Two-way communication between Pi and STM32 (Baud 115200).
+- **Relay Control**: Managed by STM32 GPIO (`PA0`).
+- **Modbus**: Read by STM32 via RS485 transceiver.
 
-Build with [PlatformIO](https://platformio.org/):
+Build STM32 firmware with [PlatformIO](https://platformio.org/):
 
 ```bash
-cd Firmware/ESP32_wifi_CCMS_v2.0
+cd Firmware/STM32_Peripheral
 pio run -t upload
 ```
 
@@ -193,6 +196,8 @@ CCMS_PORTAL/
 ├── Backend/
 │   └── Lambda/                        ← AWS Lambda backend
 ├── Firmware/
+│   ├── RPi_Gateway/                   ← Raspberry Pi Python daemon
+│   ├── STM32_Peripheral/              ← STM32 hardware controller
 │   ├── ESP32_wifi_CCMS_v1.0/          ← Firmware v1.0
 │   ├── ESP32_wifi_CCMS_v2.0/          ← Firmware v2.0
 │   └── ESP32_wifi_CCMS_v2.0_PI_link/  ← Firmware v2.0 (Pi link variant)
