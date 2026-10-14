@@ -6,8 +6,8 @@ const char *ssid     = "Airtel_Node";
 const char *password = "air66343";
 
 // ─── AWS IoT Core ─────────────────────────────────────────────────────────────
-// Endpoint and client ID come from the provisioned device in AWS IoT
-const char *mqtt_server    = "a2v9q7tqw1l9r4-ats.iot.ap-south-1.amazonaws.com";
+// These must match the AWS IoT Thing and the backend's meter_id partition key.
+const char *mqtt_server    = "a3ia5opqzsvf3l-ats.iot.us-east-1.amazonaws.com";
 const int   mqtt_port      = 8883;
 const char *mqtt_client_id = "Meter_001";
 const char *mqtt_topic     = "meter/telemetry/Meter_001";

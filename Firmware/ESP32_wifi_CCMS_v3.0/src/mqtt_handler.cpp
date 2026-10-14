@@ -78,10 +78,9 @@ void publishMqttData()
 
   if (mqttClient.connected())
   {
-    char telemetry_topic[128];
-    snprintf(telemetry_topic, sizeof(telemetry_topic), "meter/telemetry/%s", mqtt_client_id);
-
-    if (mqttClient.publish(telemetry_topic, payload.c_str()))
+    // Publish to the topic provisioned for this meter.  Keeping this separate
+    // from the MQTT client ID prevents an accidental publish to a stale topic.
+    if (mqttClient.publish(mqtt_topic, payload.c_str()))
     {
       Serial.println("=== MQTT DATA PUBLISHED ===");
       Serial.println(payload);

@@ -14,14 +14,14 @@ extern const char *mqtt_client_id;
 extern const char *mqtt_topic;
 
 // Pin Definitions
-#define RX2_PIN 16
-#define TX2_PIN 17
+#define RX2_PIN 17
+#define TX2_PIN 16
 // I2C for OLED only (no external RTC)
 #define I2C_SDA 21
 #define I2C_SCL 22
 
 // Sensors & I/O
-#define RELAY_PIN   23   // v3.0: relay moved to GPIO 23
+#define RELAY_PIN 23 // v3.0: relay moved to GPIO 23
 #define BAT_ADC_PIN 34
 #define MAINS_ADC_PIN 35
 #define TILT_SW_PIN 15
