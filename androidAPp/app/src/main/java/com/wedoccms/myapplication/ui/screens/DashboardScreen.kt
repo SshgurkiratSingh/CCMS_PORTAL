@@ -1,7 +1,6 @@
 package com.wedoccms.myapplication.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,10 +22,9 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ElectricMeter
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -39,7 +37,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wedoccms.myapplication.data.model.DashboardSummary
@@ -53,6 +53,7 @@ import com.wedoccms.myapplication.ui.theme.CcmsFaultRed
 import com.wedoccms.myapplication.ui.theme.CcmsNeonCyan
 import com.wedoccms.myapplication.ui.theme.CcmsOnlineGreen
 import com.wedoccms.myapplication.ui.theme.CcmsTealSecondary
+import com.wedoccms.myapplication.ui.util.MapUtils
 import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
 import com.wedoccms.myapplication.ui.viewmodel.UiState
 
@@ -72,7 +73,7 @@ fun DashboardScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 16.dp)
     ) {
-        // Header
+        // Header Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -108,7 +109,7 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            // Fleet Operational Summary HUD Cards
+            // Fleet Summary Cards
             item {
                 when (val state = summaryState) {
                     is UiState.Loading -> {
@@ -137,7 +138,7 @@ fun DashboardScreen(
                 }
             }
 
-            // Fleet Health Distribution Bar
+            // Health Status Distribution Bar
             item {
                 when (val state = snapshotState) {
                     is UiState.Success -> {
@@ -147,7 +148,7 @@ fun DashboardScreen(
                 }
             }
 
-            // Recent Active Control Nodes Header
+            // Active Control Nodes Section Header
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -262,7 +263,6 @@ private fun DashboardSummarySection(
 
 @Composable
 private fun StatusDistributionBar(items: List<SnapshotItem>) {
-    val total = items.size.coerceAtLeast(1)
     val online = items.count { it.metadata.status == PanelState.ONLINE }
     val fault = items.count { it.metadata.status == PanelState.FAULT }
     val offline = items.count { it.metadata.status == PanelState.OFFLINE }
@@ -327,8 +327,11 @@ fun PanelCardItem(
     snapshot: SnapshotItem,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val meta = snapshot.metadata
     val latestLog = snapshot.recentLogs.firstOrNull()
+    val lat = meta.location?.coordinates?.lat ?: 0.0
+    val lng = meta.location?.coordinates?.lng ?: 0.0
 
     GlassCard(
         modifier = Modifier
@@ -347,24 +350,43 @@ fun PanelCardItem(
                             text = meta.panelId,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         PulsingStatusBadge(status = meta.status)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            if (lat != 0.0 && lng != 0.0) {
+                                MapUtils.openLocationInMaps(context, lat, lng, meta.displayLocation)
+                            }
+                        }
+                    ) {
                         Icon(
                             imageVector = Icons.Default.PinDrop,
                             contentDescription = "Location",
                             tint = CcmsNeonCyan,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = meta.displayLocation,
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Default.Map,
+                            contentDescription = "Open in Maps",
+                            tint = CcmsNeonCyan,
+                            modifier = Modifier.size(13.dp)
                         )
                     }
                 }
@@ -378,30 +400,40 @@ fun PanelCardItem(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Schneider Electric Telemetry Register Grid
-            Row(
+            // 2x2 Telemetry Metric Grid
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .padding(10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(10.dp)
             ) {
-                Column {
-                    Text("Avg Volt (R3035)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${latestLog?.avgVoltage ?: "--"} V", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CcmsNeonCyan)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Voltage (R3035)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        Text("${latestLog?.avgVoltage ?: "--"} V", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CcmsNeonCyan)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Current (R3009)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        Text("${latestLog?.avgCurrent ?: "--"} A", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CcmsTealSecondary)
+                    }
                 }
-                Column {
-                    Text("Avg Current (R3009)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${latestLog?.avgCurrent ?: "--"} A", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CcmsTealSecondary)
-                }
-                Column {
-                    Text("Power Factor (R3053)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${latestLog?.totalPowerFactor ?: "--"}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CcmsBlueAccent)
-                }
-                Column {
-                    Text("Load (R3083)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${latestLog?.powerVector ?: "--"} kW", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Power Factor (R3053)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        Text("${latestLog?.totalPowerFactor ?: "--"}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = CcmsBlueAccent)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Active Load (R3083)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        Text("${latestLog?.powerVector ?: "--"} kW", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
         }

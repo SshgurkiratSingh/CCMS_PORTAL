@@ -1,7 +1,6 @@
 package com.wedoccms.myapplication.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Search
@@ -42,10 +43,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wedoccms.myapplication.data.model.PanelState
 import com.wedoccms.myapplication.data.model.SnapshotItem
+import com.wedoccms.myapplication.ui.components.EmbeddedMapView
 import com.wedoccms.myapplication.ui.components.GlassCard
 import com.wedoccms.myapplication.ui.components.PulsingStatusBadge
 import com.wedoccms.myapplication.ui.theme.CcmsBlueAccent
@@ -56,6 +59,8 @@ import com.wedoccms.myapplication.ui.theme.CcmsTealSecondary
 import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
 import com.wedoccms.myapplication.ui.viewmodel.UiState
 
+enum class PanelsViewMode { GRID, MAP }
+
 @Composable
 fun PanelsScreen(
     viewModel: CcmsViewModel,
@@ -65,6 +70,7 @@ fun PanelsScreen(
     val snapshotState by viewModel.snapshotState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf<PanelState?>(null) }
+    var viewMode by remember { mutableStateOf(PanelsViewMode.GRID) }
 
     Box(
         modifier = Modifier
@@ -76,23 +82,69 @@ fun PanelsScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
-            // Header
-            Text(
-                text = "CCMS FLEET PANELS",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = CcmsNeonCyan,
-                letterSpacing = 1.2.sp,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-            Text(
-                text = "Panel Nodes & Relay Dispatch",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            // Header Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "CCMS FLEET PANELS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = CcmsNeonCyan,
+                        letterSpacing = 1.2.sp
+                    )
+                    Text(
+                        text = "Panel Nodes & Spatial Map",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                // View Mode Toggle (Grid vs Map)
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(2.dp)
+                ) {
+                    IconButton(
+                        onClick = { viewMode = PanelsViewMode.GRID },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (viewMode == PanelsViewMode.GRID) CcmsNeonCyan.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GridView,
+                            contentDescription = "Grid View",
+                            tint = if (viewMode == PanelsViewMode.GRID) CcmsNeonCyan else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { viewMode = PanelsViewMode.MAP },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (viewMode == PanelsViewMode.MAP) CcmsNeonCyan.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Map,
+                            contentDescription = "Map View",
+                            tint = if (viewMode == PanelsViewMode.MAP) CcmsNeonCyan else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Search Bar
             OutlinedTextField(
@@ -151,7 +203,7 @@ fun PanelsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Panels List
+            // Content Area (Grid vs Spatial Map View)
             when (val state = snapshotState) {
                 is UiState.Loading -> {
                     Box(
@@ -188,20 +240,37 @@ fun PanelsScreen(
                             )
                         }
                     } else {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(filtered) { snapshot ->
-                                PanelDetailedCardItem(
-                                    snapshot = snapshot,
-                                    onToggleRelay = { turnOn ->
-                                        viewModel.toggleRelay(snapshot.metadata.panelId, turnOn)
-                                    },
-                                    onClick = { onNavigateToPanelDetail(snapshot.metadata.panelId) }
+                        if (viewMode == PanelsViewMode.MAP) {
+                            Column {
+                                Text(
+                                    text = "Spatial Nodes Interactive Map (${filtered.size} Nodes)",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                EmbeddedMapView(
+                                    panels = filtered,
+                                    onPanelSelect = { panelId -> onNavigateToPanelDetail(panelId) },
+                                    heightDp = 480
                                 )
                             }
-                            item { Spacer(modifier = Modifier.height(80.dp)) }
+                        } else {
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(filtered) { snapshot ->
+                                    PanelDetailedCardItem(
+                                        snapshot = snapshot,
+                                        onToggleRelay = { turnOn ->
+                                            viewModel.toggleRelay(snapshot.metadata.panelId, turnOn)
+                                        },
+                                        onClick = { onNavigateToPanelDetail(snapshot.metadata.panelId) }
+                                    )
+                                }
+                                item { Spacer(modifier = Modifier.height(80.dp)) }
+                            }
                         }
                     }
                 }
@@ -261,7 +330,9 @@ private fun PanelDetailedCardItem(
                             text = meta.panelId,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         PulsingStatusBadge(status = meta.status)
@@ -278,7 +349,10 @@ private fun PanelDetailedCardItem(
                         Text(
                             text = meta.displayLocation,
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                     }
                 }
@@ -338,30 +412,40 @@ private fun PanelDetailedCardItem(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Schneider Meter Telemetry Metrics
-            Row(
+            // Schneider Meter Telemetry Metrics (2x2 Grid)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .padding(10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(10.dp)
             ) {
-                Column {
-                    Text("Avg Voltage", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${latestLog?.avgVoltage ?: "--"} V", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CcmsNeonCyan)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Avg Voltage", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        Text("${latestLog?.avgVoltage ?: "--"} V", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CcmsNeonCyan)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Avg Current", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        Text("${latestLog?.avgCurrent ?: "--"} A", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CcmsTealSecondary)
+                    }
                 }
-                Column {
-                    Text("Avg Current", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${latestLog?.avgCurrent ?: "--"} A", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CcmsTealSecondary)
-                }
-                Column {
-                    Text("Power Factor", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${latestLog?.totalPowerFactor ?: "--"}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CcmsBlueAccent)
-                }
-                Column {
-                    Text("Power Vector", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${latestLog?.powerVector ?: "--"} kW", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Power Factor", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        Text("${latestLog?.totalPowerFactor ?: "--"}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CcmsBlueAccent)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Active Load", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        Text("${latestLog?.powerVector ?: "--"} kW", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
         }

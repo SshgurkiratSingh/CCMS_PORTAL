@@ -9,7 +9,6 @@ import com.wedoccms.myapplication.data.model.DashboardSummary
 import com.wedoccms.myapplication.data.model.GpsCoordinates
 import com.wedoccms.myapplication.data.model.PanelLocation
 import com.wedoccms.myapplication.data.model.PanelMetadata
-import com.wedoccms.myapplication.data.model.PanelState
 import com.wedoccms.myapplication.data.model.RtcSchedule
 import com.wedoccms.myapplication.data.model.SnapshotItem
 import com.wedoccms.myapplication.data.model.TelemetryLog
@@ -112,14 +111,30 @@ class CcmsViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleRelay(panelId: String, turnOn: Boolean) {
         viewModelScope.launch {
             _isCommandProcessing.value = true
+
+            // Optimistic Local State Update
+            val desiredStr = if (turnOn) "ON" else "OFF"
+            val currentSnapshot = _snapshotState.value
+            if (currentSnapshot is UiState.Success) {
+                val updatedItems = currentSnapshot.data.map { item ->
+                    if (item.metadata.panelId == panelId) {
+                        item.copy(metadata = item.metadata.copy(desiredState = desiredStr, relayState = desiredStr))
+                    } else {
+                        item
+                    }
+                }
+                _snapshotState.value = UiState.Success(updatedItems)
+            }
+
             val res = repository.sendRelayCommand(panelId, turnOn)
             _isCommandProcessing.value = false
+
             if (res.isSuccess) {
                 val apiResp = res.getOrThrow()
-                _userMessage.emit(apiResp.message ?: "Relay updated")
-                refreshAllData()
+                _userMessage.emit(apiResp.message ?: "Relay $desiredStr command dispatched successfully")
             } else {
-                _userMessage.emit("Failed to dispatch relay command")
+                _userMessage.emit("Failed to dispatch relay command: ${res.exceptionOrNull()?.message}")
+                refreshAllData() // Revert if failed
             }
         }
     }

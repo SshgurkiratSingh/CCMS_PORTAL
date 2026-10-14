@@ -201,25 +201,30 @@ class CcmsRepository(private val prefs: AppPreferences) {
     }
 
     suspend fun getAlerts(): Result<List<AlertItem>> = withContext(Dispatchers.IO) {
+        val alerts = mutableListOf<AlertItem>()
         if (!prefs.useMockFallback) {
             val snapshotResult = getSnapshot()
             if (snapshotResult.isSuccess) {
                 val snapshot = snapshotResult.getOrNull() ?: emptyList()
-                val realAlerts = snapshot.filter {
-                    it.metadata.status == PanelState.FAULT || it.metadata.faultCode != null
-                }.map {
-                    val meta = it.metadata
-                    AlertItem(
-                        alertId = "ALT-${meta.panelId}-${System.currentTimeMillis()}",
-                        panelId = meta.panelId,
-                        severity = AlertSeverity.CRITICAL,
-                        faultCode = meta.faultCode ?: "SYSTEM_FAULT",
-                        message = meta.faultMessage ?: "Critical fault detected on panel ${meta.panelId}",
-                        raisedAtUtc = meta.lastSeen ?: "Recently",
-                        isAcknowledged = false
-                    )
+                for (item in snapshot) {
+                    val meta = item.metadata
+                    if (meta.status == PanelState.FAULT || meta.faultCode != null) {
+                        alerts.add(
+                            AlertItem(
+                                alertId = "ALT-${meta.panelId}-${System.currentTimeMillis()}",
+                                panelId = meta.panelId,
+                                severity = AlertSeverity.CRITICAL,
+                                faultCode = meta.faultCode ?: "SYSTEM_FAULT",
+                                message = meta.faultMessage ?: "Critical fault detected on panel ${meta.panelId}",
+                                raisedAtUtc = meta.lastSeen ?: "Recently",
+                                isAcknowledged = false
+                            )
+                        )
+                    }
+                    // Run 6 Automated Detection Rules on Telemetry Logs
+                    alerts.addAll(com.wedoccms.myapplication.data.util.AlertEngine.analyzeTelemetry(meta.panelId, item.recentLogs))
                 }
-                return@withContext Result.success(realAlerts)
+                return@withContext Result.success(alerts)
             }
         }
         Result.success(getMockAlerts())

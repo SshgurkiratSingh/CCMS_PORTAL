@@ -1,7 +1,6 @@
 package com.wedoccms.myapplication.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -22,6 +20,7 @@ import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.ElectricMeter
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
@@ -49,8 +48,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wedoccms.myapplication.data.model.PanelMetadata
+import com.wedoccms.myapplication.data.model.SnapshotItem
 import com.wedoccms.myapplication.data.model.TelemetryLog
 import com.wedoccms.myapplication.ui.components.CircularGauge
+import com.wedoccms.myapplication.ui.components.EmbeddedMapView
 import com.wedoccms.myapplication.ui.components.GlassCard
 import com.wedoccms.myapplication.ui.components.MetricTile
 import com.wedoccms.myapplication.ui.components.PulsingStatusBadge
@@ -140,6 +141,25 @@ fun PanelDetailScreen(
             // Hero Status Header Banner
             item {
                 PanelHeroHeader(meta = meta, latestLog = latestLog)
+            }
+
+            // Embedded Interactive Map Section
+            if (snapshotItem != null) {
+                item {
+                    Text(
+                        text = "GPS Spatial Location Map",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                item {
+                    EmbeddedMapView(
+                        panels = listOf(snapshotItem),
+                        onPanelSelect = { },
+                        heightDp = 220
+                    )
+                }
             }
 
             // Remote Contactor Relay Control Card

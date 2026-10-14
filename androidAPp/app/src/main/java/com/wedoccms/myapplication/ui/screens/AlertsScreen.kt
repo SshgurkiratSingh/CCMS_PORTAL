@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wedoccms.myapplication.data.model.AlertItem
@@ -65,7 +66,7 @@ fun AlertsScreen(viewModel: CcmsViewModel) {
             fontSize = 11.sp,
             fontWeight = FontWeight.ExtraBold,
             color = CcmsCyanPrimary,
-            letterSpacing = 1.sp,
+            letterSpacing = 1.2.sp,
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(
@@ -194,7 +195,10 @@ private fun AlertCardItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Icon(
                         imageVector = Icons.Default.Warning,
                         contentDescription = alert.severity.name,
@@ -206,14 +210,18 @@ private fun AlertCardItem(
                         text = "${alert.panelId} • ${alert.faultCode}",
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+
+                Spacer(modifier = Modifier.width(6.dp))
 
                 Text(
                     text = alert.severity.name,
                     fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.ExtraBold,
                     color = severityColor,
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))

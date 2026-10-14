@@ -1,6 +1,6 @@
 # CCMS Portal — Centralized Command & Monitoring System
 
-A full-stack smart streetlight fleet management system with real-time monitoring, remote control, and analytics. This monorepo contains the Next.js operator console, AWS Lambda backend, ESP32 firmware for the edge devices, and PCB designs.
+A full-stack smart streetlight fleet management system with real-time monitoring, remote control, and analytics. This monorepo contains the Next.js operator console, native Android mobile application, AWS Lambda backend, ESP32 firmware for edge devices, and PCB designs.
 
 ## Screenshots & Assets
 
@@ -28,6 +28,15 @@ A full-stack smart streetlight fleet management system with real-time monitoring
 │  (operator       │  REST │   API        │       │                 │
 │   console)       │       │   Gateway    │       │                 │
 └──────────────────┘       └──────────────┘       └─────────────────┘
+         ▲                        ▲
+         │                        │
+         └─────────┬──────────────┘
+                   │ REST (x-dashboard-key / x-admin-key)
+                   ▼
+        ┌────────────────────┐
+        │    Android App     │
+        │  (CCMS Mobile Console)│
+        └────────────────────┘
 ```
 
 ### Components
@@ -35,6 +44,7 @@ A full-stack smart streetlight fleet management system with real-time monitoring
 | Layer                             | Technology                            | Location                                                         |
 | --------------------------------- | ------------------------------------- | ---------------------------------------------------------------- |
 | **Web Portal**                    | Next.js 16, React 19, Tailwind CSS v4 | [`Frontend/ccms/`](./Frontend/ccms)                              |
+| **Android App**                   | Kotlin, Jetpack Compose, Material 3, Retrofit | [`androidAPp/`](./androidAPp)                             |
 | **Backend API**                   | Python AWS Lambda                     | [`Backend/Lambda/`](./Backend/Lambda)                            |
 | **Firmware (RPi Gateway)**        | Python 3                              | [`Firmware/RPi_Gateway/`](./Firmware/RPi_Gateway)                |
 | **Firmware (STM32 Node)**         | C++ (PlatformIO), STM32               | [`Firmware/STM32_Peripheral/`](./Firmware/STM32_Peripheral)      |
@@ -43,6 +53,48 @@ A full-stack smart streetlight fleet management system with real-time monitoring
 | **Firmware v1.0**                 | C++ (PlatformIO), ESP32               | [`Firmware/ESP32_wifi_CCMS_v1.0/`](./Firmware/ESP32_wifi_CCMS_v1.0) |
 | **Hardware**                      | PCB Designs                           | [`Hardware/PCB Designs/`](./Hardware/PCB%20Designs)              |
 | **Documentation**                 | MkDocs (Material theme)               | [`docs/`](./docs), [`mkdocs.yml`](./mkdocs.yml)                  |
+
+---
+
+## Android App — Mobile Command Console (`androidAPp/`)
+
+A high-performance Android mobile application built with **Kotlin** and **Jetpack Compose (Material 3)** for real-time fleet monitoring, remote relay dispatch, and telemetry analytics.
+
+### Key Features
+
+- 📊 **Command Center Dashboard**: Fleet-wide HUD showing active nodes, active alarms, grid voltage ($V$), frequency ($Hz$), system power factor ($PF$), and instantaneous load ($kW$).
+- ⚡ **Node Fleet Browser**: Filter and search panels by Panel ID, location, or MAC address with direct relay switch toggling and optimistic UI state updates.
+- 🔍 **Live Schneider Modbus Telemetry**: Real-time readout of Schneider Electric energy meter registers (`R3027`, `R3035`, `R3109`, `R3059`, `R3053`, `R3009`, `R3083`), diagnostic battery voltage, mains status, and enclosure temperature.
+- 🚨 **Automated Telemetry Fault Detection Engine**: Runs 6 continuous telemetry analysis rules:
+  - **E001**: Sustained Low Voltage ($< 200\text{V}$)
+  - **E002**: Sustained High Voltage Spike ($> 250\text{V}$)
+  - **E003**: Power Factor Degradation ($< 0.75$)
+  - **E004**: Grid Frequency Instability ($< 49.5\text{Hz}$ or $> 50.5\text{Hz}$)
+  - **E006/E007**: Temperature Breach ($> 50^\circ\text{C}$ or $> 65^\circ\text{C}$)
+  - **E008**: Enclosure Tamper / Tilt Switch Triggered
+- 🗺️ **Map Location Integration**: Tap location pins to launch Google Maps pointing to exact GPS coordinates ($30.7356^\circ\text{N}, 76.7105^\circ\text{E}$).
+- 📈 **Interactive Telemetry Line Charts**: Canvas-drawn time-series graphs with touch cursor inspection and range selectors (1h, 6h, 24h, 7d).
+- ⚙️ **Dual-Key API Gateway Config**: Configure AWS Lambda endpoint, Level 1 Dashboard key (`x-dashboard-key`), Level 2 Admin key (`x-admin-key`), and toggle offline simulator mode.
+
+### Tech Stack
+
+- **Language**: Kotlin 2.2
+- **UI Framework**: Jetpack Compose, Material 3, Navigation Compose
+- **Networking**: Retrofit 2.11, OkHttp 4.12, Gson
+- **Async State**: Kotlin Coroutines, StateFlow, ViewModel
+- **Theme**: High-contrast Cyber Command Slate palette with Frosted Glassmorphism (`GlassCard`)
+
+### Build & Export APK
+
+```bash
+cd androidAPp
+./gradlew app:assembleDebug app:assembleRelease
+```
+
+#### Generated APK Paths
+
+- **Debug APK**: [`androidAPp/app/build/outputs/apk/debug/app-debug.apk`](file:///home/gurkirat/Projects/CCMS_PORTAL/androidAPp/app/build/outputs/apk/debug/app-debug.apk)
+- **Release APK**: [`androidAPp/app/build/outputs/apk/release/app-release-unsigned.apk`](file:///home/gurkirat/Projects/CCMS_PORTAL/androidAPp/app/build/outputs/apk/release/app-release-unsigned.apk)
 
 ---
 
@@ -75,7 +127,7 @@ A Next.js static export application that provides a real-time operations dashboa
 ### Environment Variables
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=<Lambda API Gateway endpoint>
+NEXT_PUBLIC_API_BASE_URL=https://85siwerqrg.execute-api.us-east-1.amazonaws.com/default/
 ```
 
 Copy `Frontend/ccms/.env.example` → `Frontend/ccms/.env.local` and fill in real values.
@@ -191,6 +243,7 @@ The documentation is auto-deployed via [GitHub Actions](https://github.com/setti
 
 ```text
 CCMS_PORTAL/
+├── androidAPp/                        ← Native Android App (Jetpack Compose)
 ├── Frontend/
 │   └── ccms/                          ← Next.js operator console
 ├── Backend/

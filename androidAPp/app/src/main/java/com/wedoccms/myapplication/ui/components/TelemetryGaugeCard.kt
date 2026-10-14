@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -50,10 +51,13 @@ fun MetricTile(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(24.dp)
                             .clip(CircleShape)
                             .background(color.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
@@ -62,7 +66,7 @@ fun MetricTile(
                             imageVector = icon,
                             contentDescription = label,
                             tint = color,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(13.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(6.dp))
@@ -70,22 +74,25 @@ fun MetricTile(
                         text = label,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = registerCode,
                     fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = color.copy(alpha = 0.8f),
+                    fontWeight = FontWeight.ExtraBold,
+                    color = color.copy(alpha = 0.9f),
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
-                        .background(color.copy(alpha = 0.1f))
+                        .background(color.copy(alpha = 0.15f))
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 verticalAlignment = Alignment.Bottom,
@@ -93,16 +100,18 @@ fun MetricTile(
             ) {
                 Text(
                     text = value,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = unit,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    color = color,
                     modifier = Modifier.padding(bottom = 2.dp)
                 )
             }
