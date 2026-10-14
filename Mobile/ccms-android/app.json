@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "CCMS Portal",
+    "slug": "ccms-portal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.ccms.portal"
+    }
+  }
+}
