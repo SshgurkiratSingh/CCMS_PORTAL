@@ -153,13 +153,13 @@ fun EmbeddedMapView(
                                     }
                                 }
                                 
-                                updateMarkers('${initialMarkersJson.replace("'", "\\'")}');
+                                updateMarkers(`${initialMarkersJson}`);
                             </script>
                         </body>
                         </html>
                     """.trimIndent()
 
-                    loadDataWithBaseURL("https://unpkg.com", htmlContent, "text/html", "UTF-8", null)
+                    loadDataWithBaseURL("https://map.wedoccms.com", htmlContent, "text/html", "UTF-8", null)
                 }
             },
             update = { webView ->
@@ -184,7 +184,7 @@ fun EmbeddedMapView(
                 
                 val markersJson = gson.toJson(markersList)
                 // Evaluate javascript to update markers
-                webView.evaluateJavascript("if (typeof updateMarkers === 'function') { updateMarkers('${markersJson.replace("'", "\\'")}'); }", null)
+                webView.evaluateJavascript("if (typeof updateMarkers === 'function') { updateMarkers(`${markersJson}`); }", null)
             }
         )
     }
