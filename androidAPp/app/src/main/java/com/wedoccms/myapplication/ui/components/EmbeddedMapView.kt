@@ -26,9 +26,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.wedoccms.myapplication.data.model.PanelState
 import com.wedoccms.myapplication.data.model.SnapshotItem
 import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import java.io.File
@@ -59,15 +60,20 @@ fun EmbeddedMapView(
     val mapView = remember {
         MapView(context).apply {
             setTileSource(
-                XYTileSource(
-                    "CartoDbDark",
-                    1, 20, 256, ".png",
+                object : OnlineTileSourceBase(
+                    "CartoDbDark", 
+                    1, 20, 256, ".png", 
                     arrayOf(
                         "https://a.basemaps.cartocdn.com/dark_all/",
                         "https://b.basemaps.cartocdn.com/dark_all/",
                         "https://c.basemaps.cartocdn.com/dark_all/"
-                    )
-                )
+                    ), 
+                    "CartoDB"
+                ) {
+                    override fun getTileURLString(pMapTileIndex: Long): String {
+                        return baseUrl + MapTileIndex.getZoom(pMapTileIndex) + "/" + MapTileIndex.getX(pMapTileIndex) + "/" + MapTileIndex.getY(pMapTileIndex) + mImageFilenameEnding + "?api_key=cb1_4mkc_1_9367ed4e7126c12bb4357abd"
+                    }
+                }
             )
             setMultiTouchControls(true)
             controller.setZoom(12.0)
