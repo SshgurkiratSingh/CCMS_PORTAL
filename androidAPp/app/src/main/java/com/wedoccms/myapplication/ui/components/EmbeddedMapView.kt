@@ -153,7 +153,10 @@ fun EmbeddedMapView(
                                     }
                                 }
                                 
-                                updateMarkers(`${initialMarkersJson}`);
+                                // Delay marker injection slightly to ensure Leaflet map is fully initialized
+                                setTimeout(function() {
+                                    updateMarkers('${initialMarkersJson.replace("'", "\\'")}');
+                                }, 50);
                             </script>
                         </body>
                         </html>
@@ -184,7 +187,7 @@ fun EmbeddedMapView(
                 
                 val markersJson = gson.toJson(markersList)
                 // Evaluate javascript to update markers
-                webView.evaluateJavascript("if (typeof updateMarkers === 'function') { updateMarkers(`${markersJson}`); }", null)
+                webView.evaluateJavascript("if (typeof updateMarkers === 'function') { updateMarkers('${markersJson.replace("'", "\\'")}'); }", null)
             }
         )
     }
