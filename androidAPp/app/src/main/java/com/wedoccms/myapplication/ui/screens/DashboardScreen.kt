@@ -130,7 +130,7 @@ fun DashboardScreen(
                     }
                     is UiState.Error -> {
                         Text(
-                            text = "Connection Error: \${state.message}",
+                            text = "Connection Error: ${state.message}",
                             color = CcmsFaultRed,
                             fontSize = 12.sp
                         )
@@ -217,15 +217,15 @@ private fun DashboardSummarySection(
         ) {
             StatCard(
                 title = "Fleet Nodes",
-                value = "\${summary.totalPanels}",
-                subtitle = "\${summary.onlineCount} Active • \${summary.offlineCount} Offline",
+                value = "${summary.totalPanels}",
+                subtitle = "${summary.onlineCount} Active • ${summary.offlineCount} Offline",
                 icon = Icons.Default.Lightbulb,
                 accentColor = CcmsNeonCyan,
                 modifier = Modifier.weight(1f)
             )
             StatCard(
                 title = "Active Alarms",
-                value = "\${summary.activeAlarms}",
+                value = "${summary.activeAlarms}",
                 subtitle = if (summary.activeAlarms > 0) "Requires Attention" else "All Systems Normal",
                 icon = Icons.Default.Warning,
                 accentColor = if (summary.activeAlarms > 0) CcmsFaultRed else CcmsOnlineGreen,
@@ -241,18 +241,18 @@ private fun DashboardSummarySection(
         ) {
             StatCard(
                 title = "Grid Voltage",
-                value = "\${summary.gridAvgVoltage}",
+                value = "${summary.gridAvgVoltage}",
                 unit = "V",
-                subtitle = "Frequency: \${summary.gridFrequency} Hz",
+                subtitle = "Frequency: ${summary.gridFrequency} Hz",
                 icon = Icons.Default.ElectricMeter,
                 accentColor = CcmsTealSecondary,
                 modifier = Modifier.weight(1f)
             )
             StatCard(
                 title = "Instant Load",
-                value = "\${summary.instantLoadKw}",
+                value = "${summary.instantLoadKw}",
                 unit = "kW",
-                subtitle = "Power Factor: \${summary.gridTotalPf}",
+                subtitle = "Power Factor: ${summary.gridTotalPf}",
                 icon = Icons.Default.Bolt,
                 accentColor = CcmsBlueAccent,
                 modifier = Modifier.weight(1f)
