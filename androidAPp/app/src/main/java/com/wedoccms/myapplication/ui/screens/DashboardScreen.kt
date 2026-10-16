@@ -314,9 +314,9 @@ private fun StatusDistributionBar(items: List<SnapshotItem>) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("🟢 Online: \$online", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CcmsOnlineGreen)
-                Text("🔴 Fault: \$fault", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CcmsFaultRed)
-                Text("⚪ Offline: \$offline", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("🟢 Online: ${online}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CcmsOnlineGreen)
+                Text("🔴 Fault: ${fault}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CcmsFaultRed)
+                Text("⚪ Offline: ${offline}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
