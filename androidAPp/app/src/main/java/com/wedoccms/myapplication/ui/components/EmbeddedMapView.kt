@@ -1,11 +1,10 @@
 package com.wedoccms.myapplication.ui.components
 
-import android.content.Context
 import android.graphics.Color
-import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -15,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,13 +25,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.wedoccms.myapplication.data.model.PanelState
 import com.wedoccms.myapplication.data.model.SnapshotItem
-import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
-import java.io.File
 
 @Composable
 fun EmbeddedMapView(
@@ -45,34 +41,23 @@ fun EmbeddedMapView(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Setup Osmdroid configuration to use internal cache (no external storage permission needed)
-    LaunchedEffect(Unit) {
-        val basePath = context.cacheDir
-        val osmdroidBasePath = File(basePath, "osmdroid").apply { mkdirs() }
-        val osmdroidTileCache = File(osmdroidBasePath, "tiles").apply { mkdirs() }
-        
-        Configuration.getInstance().apply {
-            userAgentValue = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
-            this.osmdroidBasePath = osmdroidBasePath
-            this.osmdroidTileCache = osmdroidTileCache
-        }
-    }
-
     val mapView = remember {
         MapView(context).apply {
-            // Use the completely free default OpenStreetMap Mapnik tiles
+            // Standard OpenStreetMap Mapnik tiles
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             controller.setZoom(12.0)
             controller.setCenter(GeoPoint(30.7333, 76.7794))
 
-            // Invert colors to create a "Dark Mode" map from the standard Light map
-            val inverseMatrix = ColorMatrix(floatArrayOf(
-                -1.0f, 0.0f, 0.0f, 0.0f, 255f,
-                0.0f, -1.0f, 0.0f, 0.0f, 255f,
-                0.0f, 0.0f, -1.0f, 0.0f, 255f,
-                0.0f, 0.0f, 0.0f, 1.0f, 0.0f
-            ))
+            // Color Matrix to invert light map into dark theme
+            val inverseMatrix = ColorMatrix(
+                floatArrayOf(
+                    -1.0f, 0.0f, 0.0f, 0.0f, 255f,
+                    0.0f, -1.0f, 0.0f, 0.0f, 255f,
+                    0.0f, 0.0f, -1.0f, 0.0f, 255f,
+                    0.0f, 0.0f, 0.0f, 1.0f, 0.0f
+                )
+            )
             overlayManager.tilesOverlay.setColorFilter(ColorMatrixColorFilter(inverseMatrix))
         }
     }
@@ -119,8 +104,6 @@ fun EmbeddedMapView(
                         position = geoPoint
                         title = meta.panelId
                         snippet = meta.displayLocation
-                        
-
                         icon = createStatusIcon(meta.status)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                         setOnMarkerClickListener { m, _ ->
@@ -138,7 +121,6 @@ fun EmbeddedMapView(
                         map.controller.setZoom(14.0)
                     } else {
                         val boundingBox = BoundingBox.fromGeoPoints(points)
-                        // Pad the bounding box slightly
                         map.post {
                             map.zoomToBoundingBox(boundingBox, true, 100)
                         }
