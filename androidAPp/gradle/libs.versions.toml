@@ -11,6 +11,7 @@ composeBom = "2026.02.01"
 retrofit = "2.11.0"
 okhttp = "4.12.0"
 gson = "2.11.0"
+osmdroid = "6.1.20"
 navigationCompose = "2.8.8"
 lifecycleViewModelCompose = "2.8.7"
 materialIconsExtended = "1.7.8"
@@ -38,6 +39,7 @@ retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

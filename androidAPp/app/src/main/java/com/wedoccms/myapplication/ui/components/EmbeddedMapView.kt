@@ -1,35 +1,38 @@
 package com.wedoccms.myapplication.ui.components
 
-import android.annotation.SuppressLint
-import android.webkit.JavascriptInterface
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.wedoccms.myapplication.data.model.SnapshotItem
-import com.google.gson.Gson
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.wedoccms.myapplication.data.model.PanelState
+import com.wedoccms.myapplication.data.model.SnapshotItem
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import java.io.File
 
-class MapWebAppInterface(private val onPanelSelect: (String) -> Unit) {
-    @JavascriptInterface
-    fun onPanelClick(panelId: String) {
-        onPanelSelect(panelId)
-    }
-}
-
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun EmbeddedMapView(
     panels: List<SnapshotItem>,
@@ -37,8 +40,57 @@ fun EmbeddedMapView(
     modifier: Modifier = Modifier,
     heightDp: Int = 300
 ) {
-    val gson = Gson()
-    
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Setup Osmdroid configuration to use internal cache (no external storage permission needed)
+    LaunchedEffect(Unit) {
+        val basePath = context.cacheDir
+        val osmdroidBasePath = File(basePath, "osmdroid").apply { mkdirs() }
+        val osmdroidTileCache = File(osmdroidBasePath, "tiles").apply { mkdirs() }
+        
+        Configuration.getInstance().apply {
+            userAgentValue = context.packageName
+            this.osmdroidBasePath = osmdroidBasePath
+            this.osmdroidTileCache = osmdroidTileCache
+        }
+    }
+
+    val mapView = remember {
+        MapView(context).apply {
+            setTileSource(
+                XYTileSource(
+                    "CartoDbDark",
+                    1, 20, 256, ".png",
+                    arrayOf(
+                        "https://a.basemaps.cartocdn.com/dark_all/",
+                        "https://b.basemaps.cartocdn.com/dark_all/",
+                        "https://c.basemaps.cartocdn.com/dark_all/"
+                    )
+                )
+            )
+            setMultiTouchControls(true)
+            controller.setZoom(12.0)
+            controller.setCenter(GeoPoint(30.7333, 76.7794))
+        }
+    }
+
+    // Manage MapView lifecycle
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            mapView.onDetach()
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -48,147 +100,64 @@ fun EmbeddedMapView(
             .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
     ) {
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { context ->
-                WebView(context).apply {
-                    webViewClient = WebViewClient()
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                    
-                    addJavascriptInterface(MapWebAppInterface(onPanelSelect), "AndroidBridge")
+            modifier = Modifier.fillMaxWidth().height(heightDp.dp),
+            factory = { mapView },
+            update = { map ->
+                map.overlays.clear()
+                val points = mutableListOf<GeoPoint>()
 
-                    val initialMarkersList = panels.map { snapshot ->
-                        val meta = snapshot.metadata
-                        val lat = meta.location?.coordinates?.lat ?: 30.7333
-                        val lng = meta.location?.coordinates?.lng ?: 76.7794
-                        val statusColor = when (meta.status) {
-                            PanelState.ONLINE -> "#10B981"
-                            PanelState.FAULT -> "#FF3366"
-                            else -> "#64748B"
-                        }
-                        mapOf(
-                            "id" to meta.panelId,
-                            "place" to meta.displayLocation.replace("\"", "\\\""),
-                            "lat" to lat,
-                            "lng" to lng,
-                            "color" to statusColor,
-                            "status" to meta.status.name
-                        )
-                    }
-                    val initialMarkersJson = gson.toJson(initialMarkersList)
-
-                    val htmlContent = """
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-                            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-                            <style>
-                                body { margin: 0; padding: 0; background-color: #080C14; }
-                                #map { height: 100vh; width: 100vw; background: #080C14; }
-                                .leaflet-popup-content-wrapper {
-                                    background: #0F172A;
-                                    color: #F8FAFC;
-                                    border: 1px solid #00F0FF;
-                                    border-radius: 12px;
-                                    font-family: sans-serif;
-                                    font-size: 12px;
-                                }
-                                .leaflet-popup-tip { background: #0F172A; }
-                                .inspect-btn {
-                                    background: #00F0FF;
-                                    color: #080C14;
-                                    border: none;
-                                    padding: 6px 12px;
-                                    border-radius: 6px;
-                                    font-weight: bold;
-                                    cursor: pointer;
-                                    margin-top: 6px;
-                                    width: 100%;
-                                }
-                            </style>
-                        </head>
-                        <body>
-                            <div id="map"></div>
-                            <script>
-                                var map = L.map('map', { zoomControl: false }).setView([30.7333, 76.7794], 12);
-                                
-                                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                                    attribution: '&copy; CartoDB &copy; OpenStreetMap',
-                                    subdomains: 'abcd',
-                                    maxZoom: 19
-                                }).addTo(map);
-
-                                var currentMarkers = [];
-
-                                function updateMarkers(markersJsonString) {
-                                    var markers = JSON.parse(markersJsonString);
-                                    
-                                    // Remove old markers
-                                    currentMarkers.forEach(function(m) { map.removeLayer(m); });
-                                    currentMarkers = [];
-                                    
-                                    var bounds = [];
-
-                                    markers.forEach(function(m) {
-                                        var customIcon = L.divIcon({
-                                            className: 'custom-div-icon',
-                                            html: "<div style='background-color:" + m.color + "; width:16px; height:16px; border-radius:50%; border:3px solid #FFFFFF; box-shadow: 0 0 10px " + m.color + ";'></div>",
-                                            iconSize: [16, 16],
-                                            iconAnchor: [8, 8]
-                                        });
-
-                                        var marker = L.marker([m.lat, m.lng], { icon: customIcon }).addTo(map);
-                                        currentMarkers.push(marker);
-                                        bounds.push([m.lat, m.lng]);
-
-                                        var popupContent = "<div style='text-align:center;'><b>" + m.id + "</b><br/>" + m.place + "<br/><span style='color:" + m.color + ";font-weight:bold;'>" + m.status + "</span><br/><button class='inspect-btn' onclick='window.AndroidBridge.onPanelClick(\"" + m.id + "\")'>Inspect Console</button></div>";
-                                        marker.bindPopup(popupContent);
-                                    });
-
-                                    if (bounds.length > 0) {
-                                        map.fitBounds(bounds, { padding: [30, 30] });
-                                    }
-                                }
-                                
-                                // Delay marker injection slightly to ensure Leaflet map is fully initialized
-                                setTimeout(function() {
-                                    updateMarkers('${initialMarkersJson.replace("'", "\\'")}');
-                                }, 50);
-                            </script>
-                        </body>
-                        </html>
-                    """.trimIndent()
-
-                    loadDataWithBaseURL("https://map.wedoccms.com", htmlContent, "text/html", "UTF-8", null)
-                }
-            },
-            update = { webView ->
-                val markersList = panels.map { snapshot ->
-                    val meta = snapshot.metadata
+                panels.forEach { panel ->
+                    val meta = panel.metadata
                     val lat = meta.location?.coordinates?.lat ?: 30.7333
                     val lng = meta.location?.coordinates?.lng ?: 76.7794
-                    val statusColor = when (meta.status) {
-                        PanelState.ONLINE -> "#10B981"
-                        PanelState.FAULT -> "#FF3366"
-                        else -> "#64748B"
+                    val geoPoint = GeoPoint(lat, lng)
+                    points.add(geoPoint)
+
+                    val marker = Marker(map).apply {
+                        position = geoPoint
+                        title = meta.panelId
+                        snippet = meta.displayLocation
+                        
+
+                        icon = createStatusIcon(meta.status)
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        setOnMarkerClickListener { m, _ ->
+                            m.showInfoWindow()
+                            onPanelSelect(meta.panelId)
+                            true
+                        }
                     }
-                    mapOf(
-                        "id" to meta.panelId,
-                        "place" to meta.displayLocation.replace("\"", "\\\""),
-                        "lat" to lat,
-                        "lng" to lng,
-                        "color" to statusColor,
-                        "status" to meta.status.name
-                    )
+                    map.overlays.add(marker)
                 }
-                
-                val markersJson = gson.toJson(markersList)
-                // Evaluate javascript to update markers
-                webView.evaluateJavascript("if (typeof updateMarkers === 'function') { updateMarkers('${markersJson.replace("'", "\\'")}'); }", null)
+
+                if (points.isNotEmpty()) {
+                    if (points.size == 1) {
+                        map.controller.setCenter(points.first())
+                        map.controller.setZoom(14.0)
+                    } else {
+                        val boundingBox = BoundingBox.fromGeoPoints(points)
+                        // Pad the bounding box slightly
+                        map.post {
+                            map.zoomToBoundingBox(boundingBox, true, 100)
+                        }
+                    }
+                }
+                map.invalidate()
             }
         )
+    }
+}
+
+private fun createStatusIcon(status: PanelState): Drawable {
+    val color = when (status) {
+        PanelState.ONLINE -> Color.parseColor("#10B981")
+        PanelState.FAULT -> Color.parseColor("#FF3366")
+        else -> Color.parseColor("#64748B")
+    }
+    return GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        setColor(color)
+        setStroke(4, Color.WHITE)
+        setSize(40, 40)
     }
 }
