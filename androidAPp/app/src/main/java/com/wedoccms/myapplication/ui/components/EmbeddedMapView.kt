@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -26,10 +28,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.wedoccms.myapplication.data.model.PanelState
 import com.wedoccms.myapplication.data.model.SnapshotItem
 import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
-import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import java.io.File
@@ -59,25 +60,20 @@ fun EmbeddedMapView(
 
     val mapView = remember {
         MapView(context).apply {
-            setTileSource(
-                object : OnlineTileSourceBase(
-                    "CartoDbDark_Authenticated", 
-                    1, 20, 256, ".png", 
-                    arrayOf(
-                        "https://a.basemaps.cartocdn.com/dark_all/",
-                        "https://b.basemaps.cartocdn.com/dark_all/",
-                        "https://c.basemaps.cartocdn.com/dark_all/"
-                    ), 
-                    "CartoDB"
-                ) {
-                    override fun getTileURLString(pMapTileIndex: Long): String {
-                        return baseUrl + MapTileIndex.getZoom(pMapTileIndex) + "/" + MapTileIndex.getX(pMapTileIndex) + "/" + MapTileIndex.getY(pMapTileIndex) + mImageFilenameEnding + "?api_key=cb1_4mkc_1_9367ed4e7126c12bb4357abd"
-                    }
-                }
-            )
+            // Use the completely free default OpenStreetMap Mapnik tiles
+            setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
             controller.setZoom(12.0)
             controller.setCenter(GeoPoint(30.7333, 76.7794))
+
+            // Invert colors to create a "Dark Mode" map from the standard Light map
+            val inverseMatrix = ColorMatrix(floatArrayOf(
+                -1.0f, 0.0f, 0.0f, 0.0f, 255f,
+                0.0f, -1.0f, 0.0f, 0.0f, 255f,
+                0.0f, 0.0f, -1.0f, 0.0f, 255f,
+                0.0f, 0.0f, 0.0f, 1.0f, 0.0f
+            ))
+            overlayManager.tilesOverlay.setColorFilter(ColorMatrixColorFilter(inverseMatrix))
         }
     }
 
