@@ -51,7 +51,7 @@ fun EmbeddedMapView(
         val osmdroidTileCache = File(osmdroidBasePath, "tiles").apply { mkdirs() }
         
         Configuration.getInstance().apply {
-            userAgentValue = context.packageName
+            userAgentValue = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
             this.osmdroidBasePath = osmdroidBasePath
             this.osmdroidTileCache = osmdroidTileCache
         }
@@ -61,7 +61,7 @@ fun EmbeddedMapView(
         MapView(context).apply {
             setTileSource(
                 object : OnlineTileSourceBase(
-                    "CartoDbDark", 
+                    "CartoDbDark_Authenticated", 
                     1, 20, 256, ".png", 
                     arrayOf(
                         "https://a.basemaps.cartocdn.com/dark_all/",
