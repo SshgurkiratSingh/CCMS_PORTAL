@@ -58,6 +58,26 @@ fun EmbeddedMapView(
                     
                     addJavascriptInterface(MapWebAppInterface(onPanelSelect), "AndroidBridge")
 
+                    val initialMarkersList = panels.map { snapshot ->
+                        val meta = snapshot.metadata
+                        val lat = meta.location?.coordinates?.lat ?: 30.7333
+                        val lng = meta.location?.coordinates?.lng ?: 76.7794
+                        val statusColor = when (meta.status) {
+                            PanelState.ONLINE -> "#10B981"
+                            PanelState.FAULT -> "#FF3366"
+                            else -> "#64748B"
+                        }
+                        mapOf(
+                            "id" to meta.panelId,
+                            "place" to meta.displayLocation.replace("\"", "\\\""),
+                            "lat" to lat,
+                            "lng" to lng,
+                            "color" to statusColor,
+                            "status" to meta.status.name
+                        )
+                    }
+                    val initialMarkersJson = gson.toJson(initialMarkersList)
+
                     val htmlContent = """
                         <!DOCTYPE html>
                         <html>
@@ -132,12 +152,14 @@ fun EmbeddedMapView(
                                         map.fitBounds(bounds, { padding: [30, 30] });
                                     }
                                 }
+                                
+                                updateMarkers('${initialMarkersJson.replace("'", "\\'")}');
                             </script>
                         </body>
                         </html>
                     """.trimIndent()
 
-                    loadDataWithBaseURL("https://localhost", htmlContent, "text/html", "UTF-8", null)
+                    loadDataWithBaseURL("https://unpkg.com", htmlContent, "text/html", "UTF-8", null)
                 }
             },
             update = { webView ->
