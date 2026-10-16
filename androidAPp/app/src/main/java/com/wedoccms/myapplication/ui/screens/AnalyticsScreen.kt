@@ -38,7 +38,7 @@ import com.wedoccms.myapplication.ui.theme.CcmsCyanPrimary
 import com.wedoccms.myapplication.ui.theme.CcmsOnlineGreen
 import com.wedoccms.myapplication.ui.theme.CcmsTealSecondary
 import com.wedoccms.myapplication.ui.theme.CcmsWarningAmber
-import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.PanelDetailViewModel
 import com.wedoccms.myapplication.ui.viewmodel.UiState
 
 enum class MetricType(val label: String, val unit: String, val color: Color) {
@@ -50,7 +50,7 @@ enum class MetricType(val label: String, val unit: String, val color: Color) {
 }
 
 @Composable
-fun AnalyticsScreen(viewModel: CcmsViewModel) {
+fun AnalyticsScreen(viewModel: PanelDetailViewModel) {
     val historyState by viewModel.telemetryHistoryState.collectAsState()
     val snapshotState by viewModel.snapshotState.collectAsState()
 

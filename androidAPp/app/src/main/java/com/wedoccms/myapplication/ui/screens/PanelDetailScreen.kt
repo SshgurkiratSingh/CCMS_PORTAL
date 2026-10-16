@@ -64,13 +64,13 @@ import com.wedoccms.myapplication.ui.theme.CcmsNeonCyan
 import com.wedoccms.myapplication.ui.theme.CcmsOnlineGreen
 import com.wedoccms.myapplication.ui.theme.CcmsTealSecondary
 import com.wedoccms.myapplication.ui.theme.CcmsWarningAmber
-import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.PanelDetailViewModel
 import com.wedoccms.myapplication.ui.viewmodel.UiState
 
 @Composable
 fun PanelDetailScreen(
     panelId: String,
-    viewModel: CcmsViewModel,
+    viewModel: PanelDetailViewModel,
     onNavigateBack: () -> Unit
 ) {
     val snapshotState by viewModel.snapshotState.collectAsState()
@@ -125,7 +125,7 @@ fun PanelDetailScreen(
                 }
             }
 
-            IconButton(onClick = { viewModel.refreshAllData() }) {
+            IconButton(onClick = { viewModel.refreshSnapshot(); viewModel.loadTelemetryHistory(panelId) }) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Refresh",

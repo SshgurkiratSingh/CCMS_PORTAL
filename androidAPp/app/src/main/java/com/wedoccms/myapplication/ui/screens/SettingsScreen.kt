@@ -38,10 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wedoccms.myapplication.ui.components.GlassCard
 import com.wedoccms.myapplication.ui.theme.CcmsCyanPrimary
-import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.SettingsViewModel
 
 @Composable
-fun SettingsScreen(viewModel: CcmsViewModel) {
+fun SettingsScreen(viewModel: SettingsViewModel) {
     val prefs = viewModel.prefs
 
     var baseUrl by remember { mutableStateOf(prefs.baseUrl) }

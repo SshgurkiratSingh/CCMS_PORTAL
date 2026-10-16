@@ -56,14 +56,14 @@ import com.wedoccms.myapplication.ui.theme.CcmsFaultRed
 import com.wedoccms.myapplication.ui.theme.CcmsNeonCyan
 import com.wedoccms.myapplication.ui.theme.CcmsOnlineGreen
 import com.wedoccms.myapplication.ui.theme.CcmsTealSecondary
-import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.PanelsViewModel
 import com.wedoccms.myapplication.ui.viewmodel.UiState
 
 enum class PanelsViewMode { GRID, MAP }
 
 @Composable
 fun PanelsScreen(
-    viewModel: CcmsViewModel,
+    viewModel: PanelsViewModel,
     onNavigateToPanelDetail: (String) -> Unit,
     onNavigateToManagePanel: () -> Unit
 ) {

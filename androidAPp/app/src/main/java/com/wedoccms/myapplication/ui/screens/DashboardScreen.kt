@@ -54,12 +54,12 @@ import com.wedoccms.myapplication.ui.theme.CcmsNeonCyan
 import com.wedoccms.myapplication.ui.theme.CcmsOnlineGreen
 import com.wedoccms.myapplication.ui.theme.CcmsTealSecondary
 import com.wedoccms.myapplication.ui.util.MapUtils
-import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.DashboardViewModel
 import com.wedoccms.myapplication.ui.viewmodel.UiState
 
 @Composable
 fun DashboardScreen(
-    viewModel: CcmsViewModel,
+    viewModel: DashboardViewModel,
     onNavigateToPanelDetail: (String) -> Unit,
     onNavigateToPanels: () -> Unit,
     onNavigateToAlerts: () -> Unit
@@ -130,7 +130,7 @@ fun DashboardScreen(
                     }
                     is UiState.Error -> {
                         Text(
-                            text = "Connection Error: ${state.message}",
+                            text = "Connection Error: \${state.message}",
                             color = CcmsFaultRed,
                             fontSize = 12.sp
                         )
@@ -217,15 +217,15 @@ private fun DashboardSummarySection(
         ) {
             StatCard(
                 title = "Fleet Nodes",
-                value = "${summary.totalPanels}",
-                subtitle = "${summary.onlineCount} Active • ${summary.offlineCount} Offline",
+                value = "\${summary.totalPanels}",
+                subtitle = "\${summary.onlineCount} Active • \${summary.offlineCount} Offline",
                 icon = Icons.Default.Lightbulb,
                 accentColor = CcmsNeonCyan,
                 modifier = Modifier.weight(1f)
             )
             StatCard(
                 title = "Active Alarms",
-                value = "${summary.activeAlarms}",
+                value = "\${summary.activeAlarms}",
                 subtitle = if (summary.activeAlarms > 0) "Requires Attention" else "All Systems Normal",
                 icon = Icons.Default.Warning,
                 accentColor = if (summary.activeAlarms > 0) CcmsFaultRed else CcmsOnlineGreen,
@@ -241,18 +241,18 @@ private fun DashboardSummarySection(
         ) {
             StatCard(
                 title = "Grid Voltage",
-                value = "${summary.gridAvgVoltage}",
+                value = "\${summary.gridAvgVoltage}",
                 unit = "V",
-                subtitle = "Frequency: ${summary.gridFrequency} Hz",
+                subtitle = "Frequency: \${summary.gridFrequency} Hz",
                 icon = Icons.Default.ElectricMeter,
                 accentColor = CcmsTealSecondary,
                 modifier = Modifier.weight(1f)
             )
             StatCard(
                 title = "Instant Load",
-                value = "${summary.instantLoadKw}",
+                value = "\${summary.instantLoadKw}",
                 unit = "kW",
-                subtitle = "Power Factor: ${summary.gridTotalPf}",
+                subtitle = "Power Factor: \${summary.gridTotalPf}",
                 icon = Icons.Default.Bolt,
                 accentColor = CcmsBlueAccent,
                 modifier = Modifier.weight(1f)
@@ -314,9 +314,9 @@ private fun StatusDistributionBar(items: List<SnapshotItem>) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("🟢 Online: $online", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CcmsOnlineGreen)
-                Text("🔴 Fault: $fault", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CcmsFaultRed)
-                Text("⚪ Offline: $offline", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("🟢 Online: \$online", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CcmsOnlineGreen)
+                Text("🔴 Fault: \$fault", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CcmsFaultRed)
+                Text("⚪ Offline: \$offline", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

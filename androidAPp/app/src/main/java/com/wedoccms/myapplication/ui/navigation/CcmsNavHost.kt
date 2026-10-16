@@ -2,6 +2,7 @@ package com.wedoccms.myapplication.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -14,12 +15,17 @@ import com.wedoccms.myapplication.ui.screens.ManagePanelScreen
 import com.wedoccms.myapplication.ui.screens.PanelDetailScreen
 import com.wedoccms.myapplication.ui.screens.PanelsScreen
 import com.wedoccms.myapplication.ui.screens.SettingsScreen
-import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.AlertsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.DashboardViewModel
+import com.wedoccms.myapplication.ui.viewmodel.PanelDetailViewModel
+import com.wedoccms.myapplication.ui.viewmodel.PanelsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.SettingsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.ViewModelFactory
 
 @Composable
 fun CcmsNavHost(
     navController: NavHostController,
-    viewModel: CcmsViewModel,
+    factory: ViewModelFactory,
     modifier: Modifier = Modifier
 ) {
     NavHost(
@@ -28,8 +34,9 @@ fun CcmsNavHost(
         modifier = modifier
     ) {
         composable(Screen.Dashboard.route) {
+            val vm: DashboardViewModel = viewModel(factory = factory)
             DashboardScreen(
-                viewModel = viewModel,
+                viewModel = vm,
                 onNavigateToPanelDetail = { panelId ->
                     navController.navigate(Screen.PanelDetail.createRoute(panelId))
                 },
@@ -43,8 +50,9 @@ fun CcmsNavHost(
         }
 
         composable(Screen.Panels.route) {
+            val vm: PanelsViewModel = viewModel(factory = factory)
             PanelsScreen(
-                viewModel = viewModel,
+                viewModel = vm,
                 onNavigateToPanelDetail = { panelId ->
                     navController.navigate(Screen.PanelDetail.createRoute(panelId))
                 },
@@ -55,15 +63,18 @@ fun CcmsNavHost(
         }
 
         composable(Screen.Analytics.route) {
-            AnalyticsScreen(viewModel = viewModel)
+            val vm: PanelDetailViewModel = viewModel(factory = factory)
+            AnalyticsScreen(viewModel = vm)
         }
 
         composable(Screen.Alerts.route) {
-            AlertsScreen(viewModel = viewModel)
+            val vm: AlertsViewModel = viewModel(factory = factory)
+            AlertsScreen(viewModel = vm)
         }
 
         composable(Screen.Settings.route) {
-            SettingsScreen(viewModel = viewModel)
+            val vm: SettingsViewModel = viewModel(factory = factory)
+            SettingsScreen(viewModel = vm)
         }
 
         composable(
@@ -71,16 +82,18 @@ fun CcmsNavHost(
             arguments = listOf(navArgument("panelId") { type = NavType.StringType })
         ) { backStackEntry ->
             val panelId = backStackEntry.arguments?.getString("panelId") ?: ""
+            val vm: PanelDetailViewModel = viewModel(factory = factory)
             PanelDetailScreen(
                 panelId = panelId,
-                viewModel = viewModel,
+                viewModel = vm,
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
         composable(Screen.ManagePanel.route) {
+            val vm: PanelsViewModel = viewModel(factory = factory)
             ManagePanelScreen(
-                viewModel = viewModel,
+                viewModel = vm,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

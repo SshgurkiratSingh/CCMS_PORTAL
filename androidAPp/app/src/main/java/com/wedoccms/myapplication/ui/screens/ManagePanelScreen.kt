@@ -41,11 +41,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wedoccms.myapplication.ui.components.GlassCard
 import com.wedoccms.myapplication.ui.theme.CcmsCyanPrimary
-import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.PanelsViewModel
 
 @Composable
 fun ManagePanelScreen(
-    viewModel: CcmsViewModel,
+    viewModel: PanelsViewModel,
     onNavigateBack: () -> Unit
 ) {
     var panelId by remember { mutableStateOf("") }

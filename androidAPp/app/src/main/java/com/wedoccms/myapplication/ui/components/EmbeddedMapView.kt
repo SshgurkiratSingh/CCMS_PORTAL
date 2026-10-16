@@ -2,6 +2,7 @@ package com.wedoccms.myapplication.ui.components
 
 import android.annotation.SuppressLint
 import android.webkit.JavascriptInterface
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -18,6 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.wedoccms.myapplication.data.model.SnapshotItem
+import com.google.gson.Gson
+import com.wedoccms.myapplication.data.model.PanelState
 
 class MapWebAppInterface(private val onPanelSelect: (String) -> Unit) {
     @JavascriptInterface
@@ -34,6 +37,8 @@ fun EmbeddedMapView(
     modifier: Modifier = Modifier,
     heightDp: Int = 300
 ) {
+    val gson = Gson()
+    
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -49,33 +54,9 @@ fun EmbeddedMapView(
                     webViewClient = WebViewClient()
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                    
                     addJavascriptInterface(MapWebAppInterface(onPanelSelect), "AndroidBridge")
-
-                    val markersJson = buildString {
-                        append("[")
-                        panels.forEachIndexed { index, snapshot ->
-                            val meta = snapshot.metadata
-                            val lat = meta.location?.coordinates?.lat ?: 30.7333
-                            val lng = meta.location?.coordinates?.lng ?: 76.7794
-                            val statusColor = when (meta.status) {
-                                com.wedoccms.myapplication.data.model.PanelState.ONLINE -> "#10B981"
-                                com.wedoccms.myapplication.data.model.PanelState.FAULT -> "#FF3366"
-                                else -> "#64748B"
-                            }
-                            append("""
-                                {
-                                    "id": "${meta.panelId}",
-                                    "place": "${meta.displayLocation.replace("\"", "\\\"")}",
-                                    "lat": $lat,
-                                    "lng": $lng,
-                                    "color": "$statusColor",
-                                    "status": "${meta.status.name}"
-                                }
-                            """)
-                            if (index < panels.size - 1) append(",")
-                        }
-                        append("]")
-                    }
 
                     val htmlContent = """
                         <!DOCTYPE html>
@@ -120,34 +101,68 @@ fun EmbeddedMapView(
                                     maxZoom: 19
                                 }).addTo(map);
 
-                                var markers = $markersJson;
-                                var bounds = [];
+                                var currentMarkers = [];
 
-                                markers.forEach(function(m) {
-                                    var customIcon = L.divIcon({
-                                        className: 'custom-div-icon',
-                                        html: "<div style='background-color:" + m.color + "; width:16px; height:16px; border-radius:50%; border:3px solid #FFFFFF; box-shadow: 0 0 10px " + m.color + ";'></div>",
-                                        iconSize: [16, 16],
-                                        iconAnchor: [8, 8]
+                                function updateMarkers(markersJsonString) {
+                                    var markers = JSON.parse(markersJsonString);
+                                    
+                                    // Remove old markers
+                                    currentMarkers.forEach(function(m) { map.removeLayer(m); });
+                                    currentMarkers = [];
+                                    
+                                    var bounds = [];
+
+                                    markers.forEach(function(m) {
+                                        var customIcon = L.divIcon({
+                                            className: 'custom-div-icon',
+                                            html: "<div style='background-color:" + m.color + "; width:16px; height:16px; border-radius:50%; border:3px solid #FFFFFF; box-shadow: 0 0 10px " + m.color + ";'></div>",
+                                            iconSize: [16, 16],
+                                            iconAnchor: [8, 8]
+                                        });
+
+                                        var marker = L.marker([m.lat, m.lng], { icon: customIcon }).addTo(map);
+                                        currentMarkers.push(marker);
+                                        bounds.push([m.lat, m.lng]);
+
+                                        var popupContent = "<div style='text-align:center;'><b>" + m.id + "</b><br/>" + m.place + "<br/><span style='color:" + m.color + ";font-weight:bold;'>" + m.status + "</span><br/><button class='inspect-btn' onclick='window.AndroidBridge.onPanelClick(\"" + m.id + "\")'>Inspect Console</button></div>";
+                                        marker.bindPopup(popupContent);
                                     });
 
-                                    var marker = L.marker([m.lat, m.lng], { icon: customIcon }).addTo(map);
-                                    bounds.push([m.lat, m.lng]);
-
-                                    var popupContent = "<div style='text-align:center;'><b>" + m.id + "</b><br/>" + m.place + "<br/><span style='color:" + m.color + ";font-weight:bold;'>" + m.status + "</span><br/><button class='inspect-btn' onclick='window.AndroidBridge.onPanelClick(\"" + m.id + "\")'>Inspect Console</button></div>";
-                                    marker.bindPopup(popupContent);
-                                });
-
-                                if (bounds.length > 0) {
-                                    map.fitBounds(bounds, { padding: [30, 30] });
+                                    if (bounds.length > 0) {
+                                        map.fitBounds(bounds, { padding: [30, 30] });
+                                    }
                                 }
                             </script>
                         </body>
                         </html>
                     """.trimIndent()
 
-                    loadDataWithBaseURL("https://leafletjs.com", htmlContent, "text/html", "UTF-8", null)
+                    loadDataWithBaseURL("https://localhost", htmlContent, "text/html", "UTF-8", null)
                 }
+            },
+            update = { webView ->
+                val markersList = panels.map { snapshot ->
+                    val meta = snapshot.metadata
+                    val lat = meta.location?.coordinates?.lat ?: 30.7333
+                    val lng = meta.location?.coordinates?.lng ?: 76.7794
+                    val statusColor = when (meta.status) {
+                        PanelState.ONLINE -> "#10B981"
+                        PanelState.FAULT -> "#FF3366"
+                        else -> "#64748B"
+                    }
+                    mapOf(
+                        "id" to meta.panelId,
+                        "place" to meta.displayLocation.replace("\"", "\\\""),
+                        "lat" to lat,
+                        "lng" to lng,
+                        "color" to statusColor,
+                        "status" to meta.status.name
+                    )
+                }
+                
+                val markersJson = gson.toJson(markersList)
+                // Evaluate javascript to update markers
+                webView.evaluateJavascript("if (typeof updateMarkers === 'function') { updateMarkers('${markersJson.replace("'", "\\'")}'); }", null)
             }
         )
     }

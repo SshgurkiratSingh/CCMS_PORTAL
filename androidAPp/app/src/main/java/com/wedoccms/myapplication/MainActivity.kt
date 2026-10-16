@@ -33,7 +33,8 @@ import com.wedoccms.myapplication.ui.navigation.CcmsNavHost
 import com.wedoccms.myapplication.ui.navigation.Screen
 import com.wedoccms.myapplication.ui.navigation.bottomNavItems
 import com.wedoccms.myapplication.ui.theme.CCMSTheme
-import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.SettingsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.collectLatest
 
 class MainActivity : ComponentActivity() {
@@ -41,31 +42,27 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val viewModel: CcmsViewModel = viewModel()
-            val isDarkMode by viewModel.isDarkMode.collectAsState()
+            val app = application as CcmsApplication
+            val factory = ViewModelFactory(app.repository, app.prefs)
+            
+            val settingsViewModel: SettingsViewModel = viewModel(factory = factory)
+            val isDarkMode by settingsViewModel.isDarkMode.collectAsState()
 
             CCMSTheme(darkTheme = isDarkMode) {
-                CcmsAppContent(viewModel = viewModel)
+                CcmsAppContent(factory = factory)
             }
         }
     }
 }
 
 @Composable
-fun CcmsAppContent(viewModel: CcmsViewModel) {
+fun CcmsAppContent(factory: ViewModelFactory) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(Unit) {
-        viewModel.userMessage.collectLatest { message ->
-            snackbarHostState.showSnackbar(message)
-        }
-    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Show bottom bar on primary tabs only
     val showBottomBar = currentRoute in bottomNavItems.map { it.route }
 
     Scaffold(
@@ -120,7 +117,7 @@ fun CcmsAppContent(viewModel: CcmsViewModel) {
     ) { innerPadding ->
         CcmsNavHost(
             navController = navController,
-            viewModel = viewModel,
+            factory = factory,
             modifier = Modifier.padding(innerPadding)
         )
     }

@@ -46,11 +46,11 @@ import com.wedoccms.myapplication.ui.theme.CcmsCyanPrimary
 import com.wedoccms.myapplication.ui.theme.CcmsFaultRed
 import com.wedoccms.myapplication.ui.theme.CcmsOnlineGreen
 import com.wedoccms.myapplication.ui.theme.CcmsWarningAmber
-import com.wedoccms.myapplication.ui.viewmodel.CcmsViewModel
+import com.wedoccms.myapplication.ui.viewmodel.AlertsViewModel
 import com.wedoccms.myapplication.ui.viewmodel.UiState
 
 @Composable
-fun AlertsScreen(viewModel: CcmsViewModel) {
+fun AlertsScreen(viewModel: AlertsViewModel) {
     val alertsState by viewModel.alertsState.collectAsState()
     var selectedSeverity by remember { mutableStateOf<AlertSeverity?>(null) }
 
